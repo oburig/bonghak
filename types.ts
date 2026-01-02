@@ -1,0 +1,64 @@
+
+export enum Position {
+  FW = 'FW',
+  MF = 'MF',
+  DF = 'DF',
+  GK = 'GK'
+}
+
+export enum ClubRole {
+  CHAIRMAN = '회장',
+  MANAGER = '감독',
+  COACH = '코치',
+  SECRETARY_GENERAL = '사무국장',
+  ASSISTANT_SECRETARY = '사무차장',
+  MEMBER = '회원'
+}
+
+export enum FormationType {
+  F442 = '4-4-2',
+  F433 = '4-3-3',
+  F352 = '3-5-2',
+  F343 = '3-4-3'
+}
+
+export interface Member {
+  id: string;
+  name: string;
+  phone: string;
+  position: Position;
+  clubRole: ClubRole;
+  photo?: string;
+}
+
+export interface MatchRecord {
+  memberId: string;
+  goals: number;
+  assists: number;
+  isMvp: boolean;
+}
+
+export interface Match {
+  id: string;
+  date: string;
+  category: string;
+  venue: string;
+  teamA: string[]; // member IDs
+  teamB: string[]; // member IDs
+  scoreA: number;
+  scoreB: number;
+  records: MatchRecord[];
+  photo?: string;
+}
+
+export interface PersonalStats {
+  memberId: string;
+  name: string;
+  goals: number;
+  assists: number;
+  mvpCount: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  points: number; // 3 for win, 1 for draw
+}

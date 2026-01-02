@@ -1,0 +1,7 @@
+{
+  "name": "BongHak Manager",
+  "description": "A comprehensive soccer team management system for up to 80 members, featuring match recording, stats tracking, tactical board, and communication tools.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
