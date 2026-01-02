@@ -568,7 +568,7 @@ const App: React.FC = () => {
           <h1 className="text-xl font-bold flex items-center gap-2"><Shield className="w-6 h-6" /> BongHak Manager</h1>
           <div className="text-[10px] flex items-center gap-1 mt-0.5 opacity-80">
             {syncStatus === 'success' ? (
-              <span className="flex items-center gap-1 text-green-300"><Cloud className="w-3 h-3" /> 클라우드 동기화 완료</span>
+              <span className="flex items-center gap-1 text-green-300">< className="w-3 h-3" /> 클라우드 동기화 완료</span>
             ) : (
               <span className="flex items-center gap-1 text-orange-200"><WifiOff className="w-3 h-3" /> 오프라인 모드</span>
             )}
