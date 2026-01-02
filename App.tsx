@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, CloudCheck, MapPin, Tag, AlertCircle, Info, Swords, Medal } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, CloudCheck, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award } from 'lucide-react';
 import { Member, Match, MatchRecord, Position, ClubRole, PersonalStats } from './types';
 import { INITIAL_MEMBERS } from './constants';
 import { TacticsBoard } from './components/TacticsBoard';
@@ -8,11 +8,47 @@ import { MemberSelector } from './components/MemberSelector';
 
 // 대한민국 시간(KST) YYYY-MM-DD 문자열을 반환하는 유틸리티
 const getKSTDateString = () => {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  const now = new Date();
+  // UTC 시간에 9시간을 더해 KST 날짜를 구함
+  const kstDate = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+  return kstDate.toISOString().split('T')[0];
 };
 
-// 주의: GAS 배포 시 "액세스 권한: 모든 사용자(Anyone)"로 설정했는지 꼭 확인하세요!
+// 서버 날짜(UTC/ISO)를 KST YYYY-MM-DD로 변환하는 유틸리티
+const parseToKSTDate = (dateInput: any) => {
+  if (!dateInput) return getKSTDateString();
+  try {
+    const d = new Date(dateInput);
+    // 시트에서 온 날짜가 UTC 00:00일 경우 KST로 바꾸면 09:00가 되어 날짜가 유지됨
+    // 만약 시트에서 15:00 UTC로 왔다면 KST로 다음날 00:00가 됨
+    const kstDate = new Date(d.getTime() + (9 * 60 * 60 * 1000));
+    return kstDate.toISOString().split('T')[0];
+  } catch (e) {
+    return String(dateInput).substring(0, 10);
+  }
+};
+
+// 한국어 날짜 포맷 변환 유틸리티 (예: 2024년 12월 25일 (수))
+const formatKoreanDate = (dateStr: string) => {
+  if (!dateStr) return '날짜 없음';
+  try {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    });
+  } catch (e) {
+    return dateStr;
+  }
+};
+
+// GAS 배포 URL
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweLgMusWlfUFJw5DrwOVb7Nxd2VQHV7Gzqja28FVjSNQSEeDi5WAnLqTrASEfNMnZw/exec';
+
+type SortType = 'points' | 'appearances' | 'goals' | 'assists';
 
 const App: React.FC = () => {
   const [members, setMembers] = useState<Member[]>(() => {
@@ -28,7 +64,12 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showMatchForm, setShowMatchForm] = useState(false);
   const [showMemberForm, setShowMemberForm] = useState(false);
+  const [selectedMatchDetail, setSelectedMatchDetail] = useState<Match | null>(null);
   
+  // 통계 탭 검색 및 정렬 상태
+  const [statsSearch, setStatsSearch] = useState('');
+  const [statsSort, setStatsSort] = useState<SortType>('points');
+
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
 
   const [newMatch, setNewMatch] = useState<Partial<Match>>({
@@ -74,7 +115,7 @@ const App: React.FC = () => {
 
   const safeJsonParse = (data: any) => {
     if (!data) return [];
-    if (typeof data === 'object') return data;
+    if (typeof data === 'object' && Array.isArray(data)) return data;
     try {
       return JSON.parse(data);
     } catch (e) {
@@ -111,14 +152,18 @@ const App: React.FC = () => {
         setMatches(data.matches.map((m: any) => ({
           ...m,
           id: String(m.id),
-          teamA: safeJsonParse(m.teamA),
-          teamB: safeJsonParse(m.teamB),
-          records: safeJsonParse(m.records),
+          teamA: safeJsonParse(m.teamA).map((id: any) => String(id)),
+          teamB: safeJsonParse(m.teamB).map((id: any) => String(id)),
+          records: safeJsonParse(m.records).map((r: any) => ({
+            ...r,
+            memberId: String(r.memberId || '')
+          })),
           scoreA: Number(m.scoreA || 0),
           scoreB: Number(m.scoreB || 0),
           category: m.category || '매일매일',
           venue: m.venue || '대천초등',
-          date: m.date || getKSTDateString(),
+          // 날짜 파싱 시 KST 변환 적용
+          date: parseToKSTDate(m.date),
           photo: m.photo || ''
         })));
       }
@@ -159,7 +204,7 @@ const App: React.FC = () => {
   const stats = useMemo(() => {
     const sMap: Record<string, PersonalStats> = {};
     members.forEach(m => {
-      sMap[m.id] = { memberId: m.id, name: m.name, goals: 0, assists: 0, mvpCount: 0, wins: 0, draws: 0, losses: 0, points: 0 };
+      sMap[m.id] = { memberId: m.id, name: m.name, goals: 0, assists: 0, mvpCount: 0, wins: 0, draws: 0, losses: 0, points: 0, appearances: 0 };
     });
 
     matches.forEach(m => {
@@ -169,30 +214,51 @@ const App: React.FC = () => {
       const teamAWon = sA > sB;
 
       (m.teamA || []).forEach(id => {
-        if (!sMap[id]) return;
-        if (isDraw) { sMap[id].draws++; sMap[id].points += 1; }
-        else if (teamAWon) { sMap[id].wins++; sMap[id].points += 3; }
-        else { sMap[id].losses++; }
+        const strId = String(id);
+        if (!sMap[strId]) return;
+        sMap[strId].appearances++;
+        if (isDraw) { sMap[strId].draws++; sMap[strId].points += 1; }
+        else if (teamAWon) { sMap[strId].wins++; sMap[strId].points += 3; }
+        else { sMap[strId].losses++; }
       });
 
       (m.teamB || []).forEach(id => {
-        if (!sMap[id]) return;
-        if (isDraw) { sMap[id].draws++; sMap[id].points += 1; }
-        else if (!teamAWon) { sMap[id].wins++; sMap[id].points += 3; }
-        else { sMap[id].losses++; }
+        const strId = String(id);
+        if (!sMap[strId]) return;
+        sMap[strId].appearances++;
+        if (isDraw) { sMap[strId].draws++; sMap[strId].points += 1; }
+        else if (!teamAWon) { sMap[strId].wins++; sMap[strId].points += 3; }
+        else { sMap[strId].losses++; }
       });
 
       (m.records || []).forEach(rec => {
-        if (sMap[rec.memberId]) {
-          sMap[rec.memberId].goals += Number(rec.goals || 0);
-          sMap[rec.memberId].assists += Number(rec.assists || 0);
-          if (rec.isMvp) sMap[rec.memberId].mvpCount++;
+        const targetId = String(rec.memberId || '');
+        const finalId = sMap[targetId] ? targetId : members.find(mem => mem.name === rec.name)?.id;
+        
+        if (finalId && sMap[finalId]) {
+          sMap[finalId].goals += Number(rec.goals || 0);
+          sMap[finalId].assists += Number(rec.assists || 0);
+          if (rec.isMvp) sMap[finalId].mvpCount++;
         }
       });
     });
 
-    return Object.values(sMap).sort((a, b) => b.points - a.points || b.goals - a.goals);
-  }, [matches, members]);
+    let result = Object.values(sMap);
+
+    // 검색 필터링
+    if (statsSearch.trim()) {
+      result = result.filter(s => s.name.includes(statsSearch.trim()));
+    }
+
+    // 정렬 처리
+    return result.sort((a, b) => {
+      if (statsSort === 'points') return b.points - a.points || b.goals - a.goals;
+      if (statsSort === 'appearances') return b.appearances - a.appearances || b.points - a.points;
+      if (statsSort === 'goals') return b.goals - a.goals || b.assists - a.assists;
+      if (statsSort === 'assists') return b.assists - a.assists || b.goals - a.goals;
+      return 0;
+    });
+  }, [matches, members, statsSearch, statsSort]);
 
   const teamTotalStats = useMemo(() => {
     let winsA = 0;
@@ -212,10 +278,11 @@ const App: React.FC = () => {
     if (!newMatch.teamA?.length || !newMatch.teamB?.length) return alert("두 팀 모두 선수를 선택해주세요.");
     const matchId = Date.now().toString();
 
-    const teamANames = (newMatch.teamA || []).map(id => members.find(m => m.id === id)?.name || id);
-    const teamBNames = (newMatch.teamB || []).map(id => members.find(m => m.id === id)?.name || id);
-    const recordsWithNames = (newMatch.records || []).map(r => ({
-      name: members.find(m => m.id === r.memberId)?.name || r.memberId,
+    const teamAIds = newMatch.teamA || [];
+    const teamBIds = newMatch.teamB || [];
+    const recordsWithIds = (newMatch.records || []).map(r => ({
+      memberId: String(r.memberId),
+      name: members.find(m => m.id === r.memberId)?.name || '',
       goals: r.goals,
       assists: r.assists,
       isMvp: r.isMvp
@@ -226,11 +293,11 @@ const App: React.FC = () => {
       row: [
         matchId, 
         newMatch.date, 
-        JSON.stringify(teamANames), 
-        JSON.stringify(teamBNames), 
+        JSON.stringify(teamAIds), 
+        JSON.stringify(teamBIds), 
         newMatch.scoreA, 
         newMatch.scoreB, 
-        JSON.stringify(recordsWithNames), 
+        JSON.stringify(recordsWithIds), 
         newMatch.photo || '', 
         newMatch.category, 
         newMatch.venue
@@ -311,6 +378,170 @@ const App: React.FC = () => {
     );
   };
 
+  const MatchDetailModal = ({ match, onClose }: { match: Match, onClose: () => void }) => {
+    const mvp = match.records.find(r => r.isMvp);
+    const mvpMember = mvp ? members.find(m => m.id === mvp.memberId) : null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/60 z-[60] flex flex-col p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-white rounded-3xl flex-1 flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="p-5 flex justify-between items-center border-b">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-500" />
+              <h3 className="text-lg font-black text-[#073763]">경기 상세 리포트</h3>
+            </div>
+            <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-500"><X className="w-5 h-5"/></button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-5 space-y-8">
+            {/* Header Score Info */}
+            <div className="bg-[#073763] rounded-2xl p-6 text-white text-center relative overflow-hidden">
+               <div className="relative z-10">
+                 <div className="text-[10px] font-bold opacity-60 mb-2">{formatKoreanDate(match.date)}</div>
+                 <div className="flex justify-around items-center">
+                   <div className="text-center">
+                     <div className="text-4xl font-black text-blue-300">{match.scoreA}</div>
+                     <div className="text-xs font-bold mt-1 opacity-80">봉팀</div>
+                   </div>
+                   <div className="text-lg font-black opacity-30">VS</div>
+                   <div className="text-center">
+                     <div className="text-4xl font-black text-red-300">{match.scoreB}</div>
+                     <div className="text-xs font-bold mt-1 opacity-80">학팀</div>
+                   </div>
+                 </div>
+                 <div className="mt-4 flex justify-center gap-2">
+                   <span className="bg-white/10 px-2 py-0.5 rounded text-[10px] font-bold border border-white/10">{match.venue}</span>
+                   <span className="bg-white/10 px-2 py-0.5 rounded text-[10px] font-bold border border-white/10">{match.category}</span>
+                 </div>
+               </div>
+               <div className="absolute top-0 right-0 p-4 opacity-5">
+                 <Shield className="w-24 h-24" />
+               </div>
+            </div>
+
+            {/* MVP Section */}
+            {mvpMember && (
+              <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden">
+                <div className="bg-yellow-400 p-2 rounded-xl text-white">
+                  <Award className="w-8 h-8" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-yellow-600 uppercase">Match MVP</div>
+                  <div className="text-lg font-black text-yellow-900">{mvpMember.name}</div>
+                  <div className="text-[10px] text-yellow-700 font-bold">
+                    {mvp?.goals}골 {mvp?.assists}도움 기여
+                  </div>
+                </div>
+                <div className="absolute -right-2 -bottom-2 opacity-10">
+                  <Trophy className="w-16 h-16 text-yellow-500" />
+                </div>
+              </div>
+            )}
+
+            {/* Team Lists */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-black text-blue-600 px-1 border-b pb-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                  BONG TEAM ({match.teamA.length})
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {match.teamA.map(id => {
+                    const m = members.find(mem => mem.id === id);
+                    const record = match.records.find(r => r.memberId === id);
+                    return m ? (
+                      <div key={id} className="flex items-center gap-2 p-2 bg-blue-50/50 rounded-xl border border-blue-100">
+                        <img src={m.photo} className="w-6 h-6 rounded-full object-cover" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] font-bold truncate text-blue-900">{m.name}</div>
+                          {record && (record.goals > 0 || record.assists > 0) && (
+                            <div className="flex gap-1 mt-0.5">
+                              {record.goals > 0 && <span className="text-[8px] px-1 bg-blue-200 text-blue-800 rounded font-black">G {record.goals}</span>}
+                              {record.assists > 0 && <span className="text-[8px] px-1 bg-green-200 text-green-800 rounded font-black">A {record.assists}</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-black text-red-600 px-1 border-b pb-2">
+                  <div className="w-2 h-2 rounded-full bg-red-600"></div>
+                  HAK TEAM ({match.teamB.length})
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {match.teamB.map(id => {
+                    const m = members.find(mem => mem.id === id);
+                    const record = match.records.find(r => r.memberId === id);
+                    return m ? (
+                      <div key={id} className="flex items-center gap-2 p-2 bg-red-50/50 rounded-xl border border-red-100">
+                        <img src={m.photo} className="w-6 h-6 rounded-full object-cover" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] font-bold truncate text-red-900">{m.name}</div>
+                          {record && (record.goals > 0 || record.assists > 0) && (
+                            <div className="flex gap-1 mt-0.5">
+                              {record.goals > 0 && <span className="text-[8px] px-1 bg-red-200 text-red-800 rounded font-black">G {record.goals}</span>}
+                              {record.assists > 0 && <span className="text-[8px] px-1 bg-green-200 text-green-800 rounded font-black">A {record.assists}</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Stats List */}
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-black text-gray-400 ml-1 flex items-center gap-2">
+                <Target className="w-3.5 h-3.5" /> 전체 득점 현황
+              </h4>
+              <div className="space-y-2">
+                {match.records.filter(r => r.goals > 0 || r.assists > 0).length === 0 ? (
+                  <div className="text-center py-4 text-xs text-gray-400 font-medium bg-gray-50 rounded-xl">상세 기록이 없습니다.</div>
+                ) : (
+                  match.records.filter(r => r.goals > 0 || r.assists > 0).map(r => {
+                    const m = members.find(mem => mem.id === r.memberId);
+                    const isTeamA = match.teamA.includes(r.memberId);
+                    return m ? (
+                      <div key={r.memberId} className={`flex items-center justify-between p-3 rounded-xl border ${isTeamA ? 'bg-blue-50/20 border-blue-50' : 'bg-red-50/20 border-red-50'}`}>
+                        <div className="flex items-center gap-3">
+                          <img src={m.photo} className="w-8 h-8 rounded-full object-cover" />
+                          <div className="font-bold text-sm">{m.name}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          {r.goals > 0 && (
+                            <div className="flex flex-col items-center">
+                              <Target className="w-4 h-4 text-gray-800 mb-0.5" />
+                              <span className="text-[10px] font-black">{r.goals}</span>
+                            </div>
+                          )}
+                          {r.assists > 0 && (
+                            <div className="flex flex-col items-center">
+                              <Send className="w-4 h-4 text-green-600 mb-0.5" />
+                              <span className="text-[10px] font-black">{r.assists}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null;
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-5 border-t bg-gray-50">
+            <button onClick={onClose} className="w-full bg-[#073763] text-white py-4 rounded-2xl font-black text-lg active:scale-95 transition-transform">닫기</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-screen pb-20 max-w-md mx-auto bg-gray-50 border-x relative">
       {loading && (
@@ -374,8 +605,14 @@ const App: React.FC = () => {
                  <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
                    <div className="text-[10px] font-medium opacity-60">총 경기 수: {teamTotalStats.total}경기</div>
                    <div className="flex items-center gap-1">
-                     <div className="w-2 h-2 rounded-full bg-blue-400"></div>
-                     <div className="text-[10px] font-bold">Bong Team Leads</div>
+                     <div className={`w-2 h-2 rounded-full ${
+                       teamTotalStats.winsA > teamTotalStats.winsB ? 'bg-blue-400' : 
+                       teamTotalStats.winsB > teamTotalStats.winsA ? 'bg-red-400' : 'bg-gray-400'
+                     }`}></div>
+                     <div className="text-[10px] font-bold">
+                       {teamTotalStats.winsA > teamTotalStats.winsB ? 'Bong Team Leads' : 
+                        teamTotalStats.winsB > teamTotalStats.winsA ? 'Hak Team Leads' : 'Teams are Tied'}
+                     </div>
                    </div>
                  </div>
                </div>
@@ -393,8 +630,8 @@ const App: React.FC = () => {
                   {matches.slice(0, 3).map(m => (
                     <div key={m.id} className="border-b pb-3 last:border-0">
                       <div className="flex justify-between items-center mb-1">
-                        <div className="text-[10px] text-gray-400 font-bold">
-                          {m.date ? m.date.substring(0, 10) : '날짜 없음'}
+                        <div className="text-[10px] text-gray-500 font-black tracking-tight">
+                          {formatKoreanDate(m.date)}
                         </div>
                         <div className="flex gap-1">
                           <span className="bg-gray-100 text-gray-500 text-[9px] px-1.5 py-0.5 rounded font-black border border-gray-200">
@@ -405,7 +642,7 @@ const App: React.FC = () => {
                           </span>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center px-4">
+                      <div className="flex justify-between items-center px-4 mb-3">
                         <div className="text-center w-20">
                           <div className="text-2xl font-black text-blue-800">{m.scoreA}</div>
                           <div className="text-[10px] font-bold text-gray-400">봉팀</div>
@@ -416,6 +653,12 @@ const App: React.FC = () => {
                           <div className="text-[10px] font-bold text-gray-400">학팀</div>
                         </div>
                       </div>
+                      <button 
+                        onClick={() => setSelectedMatchDetail(m)}
+                        className="w-full py-2 bg-gray-50 text-gray-500 text-[10px] font-black rounded-lg flex items-center justify-center gap-1 active:bg-gray-100 transition-colors"
+                      >
+                        상세보기 <ChevronRight className="w-3 h-3" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -466,32 +709,91 @@ const App: React.FC = () => {
 
         {activeTab === 'stats' && (
           <div className="space-y-4">
-            <h2 className="text-xl font-bold px-2 text-[#073763]">개인 기록 랭킹</h2>
+            <div className="px-2">
+              <h2 className="text-xl font-bold text-[#073763]">개인 기록 랭킹</h2>
+              <p className="text-[10px] text-gray-400 font-bold mt-1 flex items-center gap-1">
+                <Info className="w-3 h-3" /> PTS(승점): 승리 3점, 무승부 1점
+              </p>
+            </div>
+
+            {/* 검색 및 필터 영역 */}
+            <div className="px-2 space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="이름으로 검색..." 
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-[#073763]/10 transition-all"
+                  value={statsSearch}
+                  onChange={(e) => setStatsSearch(e.target.value)}
+                />
+                {statsSearch && (
+                  <button 
+                    onClick={() => setStatsSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-gray-100 rounded-full"
+                  >
+                    <X className="w-3 h-3 text-gray-400" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
+                {[
+                  { id: 'points', label: 'PTS순' },
+                  { id: 'appearances', label: '출전순' },
+                  { id: 'goals', label: '득점순' },
+                  { id: 'assists', label: '도움순' }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setStatsSort(item.id as SortType)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-all ${
+                      statsSort === item.id 
+                        ? 'bg-[#073763] text-white shadow-md' 
+                        : 'bg-white text-gray-400 border border-gray-50'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="p-4 text-left font-bold text-gray-500">순위</th>
                     <th className="p-4 text-left font-bold text-gray-500">이름</th>
-                    <th className="p-4 text-center font-bold text-gray-500">득점</th>
-                    <th className="p-4 text-center font-bold text-gray-500">도움</th>
-                    <th className="p-4 text-right font-bold text-[#073763]">PTS</th>
+                    <th className={`p-4 text-center font-bold transition-colors ${statsSort === 'appearances' ? 'text-[#073763] bg-[#073763]/5' : 'text-gray-500'}`}>출전</th>
+                    <th className={`p-4 text-center font-bold transition-colors ${statsSort === 'goals' ? 'text-[#073763] bg-[#073763]/5' : 'text-gray-500'}`}>득점</th>
+                    <th className={`p-4 text-center font-bold transition-colors ${statsSort === 'assists' ? 'text-[#073763] bg-[#073763]/5' : 'text-gray-500'}`}>도움</th>
+                    <th className={`p-4 text-right font-bold transition-colors ${statsSort === 'points' ? 'text-[#073763] bg-[#073763]/5' : 'text-gray-500'}`}>PTS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.slice(0, 20).map((s, idx) => {
-                    const isTop3 = idx < 3;
-                    const medalClass = idx === 0 ? 'bg-yellow-400 text-white' : idx === 1 ? 'bg-gray-300 text-white' : idx === 2 ? 'bg-orange-300 text-white' : 'bg-gray-100 text-gray-400';
-                    return (
-                      <tr key={s.memberId} className={`border-b last:border-0 ${isTop3 ? 'bg-gray-50/50' : ''}`}>
-                        <td className="p-4"><span className={`inline-block w-6 h-6 text-center rounded-lg text-xs font-bold leading-6 ${medalClass}`}>{idx + 1}</span></td>
-                        <td className="p-4 font-bold text-gray-800">{s.name}</td>
-                        <td className="p-4 text-center font-medium">{s.goals}</td>
-                        <td className="p-4 text-center font-medium">{s.assists}</td>
-                        <td className="p-4 text-right text-[#073763] font-black">{s.points}</td>
-                      </tr>
-                    );
-                  })}
+                  {stats.length > 0 ? (
+                    stats.slice(0, 50).map((s, idx) => {
+                      const isTop3 = idx < 3 && !statsSearch;
+                      const medalClass = idx === 0 ? 'bg-yellow-400 text-white' : idx === 1 ? 'bg-gray-300 text-white' : idx === 2 ? 'bg-orange-300 text-white' : 'bg-gray-100 text-gray-400';
+                      return (
+                        <tr key={s.memberId} className={`border-b last:border-0 ${isTop3 ? 'bg-gray-50/50' : ''}`}>
+                          <td className="p-4"><span className={`inline-block w-6 h-6 text-center rounded-lg text-xs font-bold leading-6 ${medalClass}`}>{idx + 1}</span></td>
+                          <td className="p-4 font-bold text-gray-800">{s.name}</td>
+                          <td className={`p-4 text-center font-medium ${statsSort === 'appearances' ? 'font-black text-[#073763]' : ''}`}>{s.appearances}</td>
+                          <td className={`p-4 text-center font-medium ${statsSort === 'goals' ? 'font-black text-[#073763]' : ''}`}>{s.goals}</td>
+                          <td className={`p-4 text-center font-medium ${statsSort === 'assists' ? 'font-black text-[#073763]' : ''}`}>{s.assists}</td>
+                          <td className={`p-4 text-right font-black ${statsSort === 'points' ? 'text-[#073763]' : 'text-gray-400'}`}>{s.points}</td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="p-10 text-center text-gray-400 text-xs font-medium">
+                        검색 결과가 없습니다.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -678,6 +980,14 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Match Detail Modal */}
+      {selectedMatchDetail && (
+        <MatchDetailModal 
+          match={selectedMatchDetail} 
+          onClose={() => setSelectedMatchDetail(null)} 
+        />
       )}
     </div>
   );

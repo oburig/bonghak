@@ -61,4 +61,5 @@ export interface PersonalStats {
   draws: number;
   losses: number;
   points: number; // 3 for win, 1 for draw
+  appearances: number; // 출전수 추가
 }
