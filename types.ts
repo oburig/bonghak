@@ -33,6 +33,8 @@ export interface Member {
 
 export interface MatchRecord {
   memberId: string;
+  // Added name property to fix "Property 'name' does not exist on type 'MatchRecord'" error in App.tsx
+  name?: string;
   goals: number;
   assists: number;
   isMvp: boolean;
