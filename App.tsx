@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, CheckCircle, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, CloudCheck, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award } from 'lucide-react';
 import { Member, Match, MatchRecord, Position, ClubRole, PersonalStats } from './types';
 import { INITIAL_MEMBERS } from './constants';
 import { TacticsBoard } from './components/TacticsBoard';
@@ -20,7 +20,6 @@ const parseToKSTDate = (dateInput: any) => {
   try {
     const d = new Date(dateInput);
     // 시트에서 온 날짜가 UTC 00:00일 경우 KST로 바꾸면 09:00가 되어 날짜가 유지됨
-    // 만약 시트에서 15:00 UTC로 왔다면 KST로 다음날 00:00가 됨
     const kstDate = new Date(d.getTime() + (9 * 60 * 60 * 1000));
     return kstDate.toISOString().split('T')[0];
   } catch (e) {
@@ -71,6 +70,7 @@ const App: React.FC = () => {
   const [statsSort, setStatsSort] = useState<SortType>('points');
 
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
 
   const [newMatch, setNewMatch] = useState<Partial<Match>>({
     date: getKSTDateString(),
@@ -87,11 +87,11 @@ const App: React.FC = () => {
   useEffect(() => {
     if (showMatchForm) {
       const calculatedScoreA = (newMatch.records || [])
-        .filter(r => newMatch.teamA?.includes(r.memberId))
+        .filter(r => (newMatch.teamA || []).includes(r.memberId))
         .reduce((sum, r) => sum + (Number(r.goals) || 0), 0);
       
       const calculatedScoreB = (newMatch.records || [])
-        .filter(r => newMatch.teamB?.includes(r.memberId))
+        .filter(r => (newMatch.teamB || []).includes(r.memberId))
         .reduce((sum, r) => sum + (Number(r.goals) || 0), 0);
 
       if (calculatedScoreA !== newMatch.scoreA || calculatedScoreB !== newMatch.scoreB) {
@@ -162,7 +162,6 @@ const App: React.FC = () => {
           scoreB: Number(m.scoreB || 0),
           category: m.category || '매일매일',
           venue: m.venue || '대천초등',
-          // 날짜 파싱 시 KST 변환 적용
           date: parseToKSTDate(m.date),
           photo: m.photo || ''
         })));
@@ -276,7 +275,9 @@ const App: React.FC = () => {
 
   const handleSaveMatch = () => {
     if (!newMatch.teamA?.length || !newMatch.teamB?.length) return alert("두 팀 모두 선수를 선택해주세요.");
-    const matchId = Date.now().toString();
+    
+    const isEdit = !!editingMatchId;
+    const matchId = editingMatchId || Date.now().toString();
 
     const teamAIds = newMatch.teamA || [];
     const teamBIds = newMatch.teamB || [];
@@ -289,7 +290,9 @@ const App: React.FC = () => {
     }));
 
     const payload = {
-      type: 'Matches', action: 'add',
+      type: 'Matches', 
+      action: isEdit ? 'update' : 'add',
+      id: isEdit ? matchId : undefined,
       row: [
         matchId, 
         newMatch.date, 
@@ -305,6 +308,7 @@ const App: React.FC = () => {
     };
     syncToSheet(payload);
     setShowMatchForm(false);
+    setEditingMatchId(null);
     setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [] });
   };
 
@@ -352,14 +356,14 @@ const App: React.FC = () => {
         <div className="flex items-center gap-1.5">
           <div className="relative">
             <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-gray-400">G</span>
-            <input type="number" className="w-12 p-1.5 bg-white border border-gray-100 rounded-lg text-center text-xs font-bold outline-none focus:ring-1 focus:ring-gray-200" value={record.goals} onChange={(e) => {
+            <input type="number" className="w-16 p-1.5 bg-white border border-gray-100 rounded-lg text-center text-xs font-bold outline-none focus:ring-1 focus:ring-gray-200" value={record.goals} onChange={(e) => {
               const otherRecords = (newMatch.records || []).filter(r => r.memberId !== id);
               setNewMatch({ ...newMatch, records: [...otherRecords, { ...record, goals: parseInt(e.target.value) || 0 }] });
             }} />
           </div>
           <div className="relative">
             <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-gray-400">A</span>
-            <input type="number" className="w-12 p-1.5 bg-white border border-gray-100 rounded-lg text-center text-xs font-bold outline-none focus:ring-1 focus:ring-gray-200" value={record.assists} onChange={(e) => {
+            <input type="number" className="w-16 p-1.5 bg-white border border-gray-100 rounded-lg text-center text-xs font-bold outline-none focus:ring-1 focus:ring-gray-200" value={record.assists} onChange={(e) => {
               const otherRecords = (newMatch.records || []).filter(r => r.memberId !== id);
               setNewMatch({ ...newMatch, records: [...otherRecords, { ...record, assists: parseInt(e.target.value) || 0 }] });
             }} />
@@ -568,7 +572,7 @@ const App: React.FC = () => {
           <h1 className="text-xl font-bold flex items-center gap-2"><Shield className="w-6 h-6" /> BongHak Manager</h1>
           <div className="text-[10px] flex items-center gap-1 mt-0.5 opacity-80">
             {syncStatus === 'success' ? (
-              <span className="flex items-center gap-1 text-green-300"><CheckCircle className="w-3 h-3" /> 클라우드 동기화 완료</span>
+              <span className="flex items-center gap-1 text-green-300"><CloudCheck className="w-3 h-3" /> 클라우드 동기화 완료</span>
             ) : (
               <span className="flex items-center gap-1 text-orange-200"><WifiOff className="w-3 h-3" /> 오프라인 모드</span>
             )}
@@ -653,19 +657,45 @@ const App: React.FC = () => {
                           <div className="text-[10px] font-bold text-gray-400">학팀</div>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => setSelectedMatchDetail(m)}
-                        className="w-full py-2 bg-gray-50 text-gray-500 text-[10px] font-black rounded-lg flex items-center justify-center gap-1 active:bg-gray-100 transition-colors"
-                      >
-                        상세보기 <ChevronRight className="w-3 h-3" />
-                      </button>
+                      <div className="flex gap-2 w-full mt-3">
+                        <button 
+                          onClick={() => setSelectedMatchDetail(m)}
+                          className="flex-1 py-2 bg-gray-50 text-gray-500 text-[10px] font-black rounded-lg flex items-center justify-center gap-1 active:bg-gray-100 transition-colors"
+                        >
+                          상세보기 <ChevronRight className="w-3 h-3" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setNewMatch({
+                              date: m.date,
+                              category: m.category,
+                              venue: m.venue,
+                              teamA: m.teamA,
+                              teamB: m.teamB,
+                              scoreA: m.scoreA,
+                              scoreB: m.scoreB,
+                              records: m.records,
+                              photo: m.photo
+                            });
+                            setEditingMatchId(m.id);
+                            setShowMatchForm(true);
+                          }}
+                          className="px-3 py-2 bg-[#073763]/10 text-[#073763] text-[10px] font-black rounded-lg flex items-center justify-center gap-1 active:bg-[#073763]/20 transition-colors"
+                        >
+                          기록수정 <Edit2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
               <button 
-                onClick={() => setShowMatchForm(true)}
-                className="w-full mt-4 bg-[#073763] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg shadow-[#073763]/20"
+                onClick={() => {
+                  setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [] });
+                  setEditingMatchId(null);
+                  setShowMatchForm(true);
+                }}
+                className="w-full mt-4 bg-red-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg shadow-red-600/20"
               >
                 <Plus className="w-5 h-5" /> 새 경기 기록하기
               </button>
@@ -870,8 +900,8 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 z-50 flex flex-col p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl flex-1 flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
             <div className="bg-white p-5 flex justify-between items-center border-b">
-              <h3 className="text-xl font-black text-[#073763]">경기 기록</h3>
-              <button onClick={() => setShowMatchForm(false)} className="p-2 bg-gray-100 rounded-full text-gray-500"><X className="w-6 h-6"/></button>
+              <h3 className="text-xl font-black text-[#073763]">{editingMatchId ? "경기 기록 수정" : "경기 기록 등록"}</h3>
+              <button onClick={() => { setShowMatchForm(false); setEditingMatchId(null); }} className="p-2 bg-gray-100 rounded-full text-gray-500"><X className="w-6 h-6"/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Match Header Info */}
@@ -916,7 +946,7 @@ const App: React.FC = () => {
               </div>
               
               <div className="space-y-4">
-                <div className="h-44 border rounded-2xl overflow-hidden bg-gray-50 flex flex-col">
+                <div className="h-72 border rounded-2xl overflow-hidden bg-gray-50 flex flex-col">
                   <div className="p-2 bg-blue-100/50 text-[#073763] text-[10px] font-black uppercase tracking-wider text-center">
                     봉팀 선수 (A) {newMatch.teamA?.length ? `(${newMatch.teamA.length})` : ''}
                   </div>
@@ -924,7 +954,7 @@ const App: React.FC = () => {
                     <MemberSelector members={members} selectedIds={newMatch.teamA || []} onToggle={(id) => setNewMatch({ ...newMatch, teamA: newMatch.teamA?.includes(id) ? newMatch.teamA.filter(i => i !== id) : [...(newMatch.teamA || []), id] })} />
                   </div>
                 </div>
-                <div className="h-44 border rounded-2xl overflow-hidden bg-gray-50 flex flex-col">
+                <div className="h-72 border rounded-2xl overflow-hidden bg-gray-50 flex flex-col">
                   <div className="p-2 bg-red-100/50 text-[#073763] text-[10px] font-black uppercase tracking-wider text-center">
                     학팀 선수 (B) {newMatch.teamB?.length ? `(${newMatch.teamB.length})` : ''}
                   </div>
@@ -976,7 +1006,9 @@ const App: React.FC = () => {
                    '무승부 예상'}
                 </span>
               </div>
-              <button onClick={handleSaveMatch} className="w-full bg-[#073763] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-[#073763]/20 active:scale-95 transition-transform">경기 기록 저장</button>
+              <button onClick={handleSaveMatch} className="w-full bg-[#073763] text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-[#073763]/20 active:scale-95 transition-transform">
+                {editingMatchId ? "기록 수정 완료" : "경기 기록 저장"}
+              </button>
             </div>
           </div>
         </div>
