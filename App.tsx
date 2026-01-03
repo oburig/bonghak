@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, CloudCheck, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, Cloud, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award } from 'lucide-react';
 import { Member, Match, MatchRecord, Position, ClubRole, PersonalStats } from './types';
 import { INITIAL_MEMBERS } from './constants';
 import { TacticsBoard } from './components/TacticsBoard';
@@ -572,7 +572,7 @@ const App: React.FC = () => {
           <h1 className="text-xl font-bold flex items-center gap-2"><Shield className="w-6 h-6" /> BongHak Manager</h1>
           <div className="text-[10px] flex items-center gap-1 mt-0.5 opacity-80">
             {syncStatus === 'success' ? (
-              <span className="flex items-center gap-1 text-green-300"><CloudCheck className="w-3 h-3" /> 클라우드 동기화 완료</span>
+              <span className="flex items-center gap-1 text-green-300"><Check className="w-3 h-3" /> 클라우드 동기화 완료</span>
             ) : (
               <span className="flex items-center gap-1 text-orange-200"><WifiOff className="w-3 h-3" /> 오프라인 모드</span>
             )}
