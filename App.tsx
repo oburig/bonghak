@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, CloudCheck, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, CloudCheck, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award, Footprints, Image as ImageIcon } from 'lucide-react';
 import { Member, Match, MatchRecord, Position, ClubRole, PersonalStats } from './types';
 import { INITIAL_MEMBERS } from './constants';
 import { TacticsBoard } from './components/TacticsBoard';
@@ -70,6 +70,7 @@ const App: React.FC = () => {
   const [statsSort, setStatsSort] = useState<SortType>('points');
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newMatch, setNewMatch] = useState<Partial<Match>>({
     date: getKSTDateString(),
@@ -79,7 +80,8 @@ const App: React.FC = () => {
     teamB: [],
     scoreA: 0,
     scoreB: 0,
-    records: []
+    records: [],
+    photo: ''
   });
 
   useEffect(() => {
@@ -139,6 +141,7 @@ const App: React.FC = () => {
           category: m.category || '매일매일',
           venue: m.venue || '대천초등',
           date: parseToKSTDate(m.date),
+          photo: m.photo || '',
         })));
       }
       setSyncStatus('success');
@@ -220,6 +223,10 @@ const App: React.FC = () => {
     return { winsA, winsB, draws, total: matches.length };
   }, [matches]);
 
+  const sortedMatches = useMemo(() => {
+    return [...matches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [matches]);
+
   const handleSaveMatch = () => {
     if (!newMatch.teamA?.length || !newMatch.teamB?.length) return alert("두 팀 모두 선수를 선택해주세요.");
     const isEdit = !!editingMatchId;
@@ -237,7 +244,7 @@ const App: React.FC = () => {
     };
     syncToSheet(payload);
     setShowMatchForm(false); setEditingMatchId(null);
-    setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [] });
+    setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' });
   };
 
   const handleSaveMember = () => {
@@ -247,6 +254,31 @@ const App: React.FC = () => {
     const row = [memberId, editingMember.name, editingMember.phone, editingMember.position || Position.MF, editingMember.photo || `https://picsum.photos/seed/${memberId}/200`, editingMember.clubRole || ClubRole.MEMBER];
     syncToSheet({ type: 'Members', action: isNew ? 'add' : 'update', id: memberId, row });
     setShowMemberForm(false); setEditingMember(null);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800; 
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const base64String = canvas.toDataURL('image/jpeg', 0.7);
+        setNewMatch(prev => ({ ...prev, photo: base64String }));
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const renderPlayerRecordInput = (id: string, teamColor: 'blue' | 'red') => {
@@ -289,6 +321,12 @@ const App: React.FC = () => {
   const MatchDetailModal = ({ match, onClose }: { match: Match, onClose: () => void }) => {
     const mvp = match.records.find(r => r.isMvp);
     const mvpMember = mvp ? members.find(m => m.id === mvp.memberId) : null;
+
+    const teamAScorers = match.records.filter(r => match.teamA.includes(r.memberId) && r.goals > 0).sort((a,b) => b.goals - a.goals);
+    const teamAAssists = match.records.filter(r => match.teamA.includes(r.memberId) && r.assists > 0).sort((a,b) => b.assists - a.assists);
+    const teamBScorers = match.records.filter(r => match.teamB.includes(r.memberId) && r.goals > 0).sort((a,b) => b.goals - a.goals);
+    const teamBAssists = match.records.filter(r => match.teamB.includes(r.memberId) && r.assists > 0).sort((a,b) => b.assists - a.assists);
+
     return (
       <div className="fixed inset-0 bg-black/60 z-[60] flex flex-col p-4 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-white rounded-3xl flex-1 flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
@@ -296,7 +334,7 @@ const App: React.FC = () => {
             <div className="flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /><h3 className="text-lg font-black text-[#073763]">경기 상세 리포트</h3></div>
             <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-500"><X className="w-5 h-5"/></button>
           </div>
-          <div className="flex-1 overflow-y-auto p-5 space-y-8">
+          <div className="flex-1 overflow-y-auto p-5 space-y-6">
             <div className="bg-[#073763] rounded-2xl p-6 text-white text-center">
               <div className="text-[10px] font-bold opacity-60 mb-2">{formatKoreanDate(match.date)}</div>
               <div className="flex justify-around items-center">
@@ -305,23 +343,113 @@ const App: React.FC = () => {
                 <div className="text-center"><div className="text-4xl font-black text-red-300">{match.scoreB}</div><div className="text-xs font-bold mt-1 opacity-80">학팀</div></div>
               </div>
             </div>
+
+            {match.photo && (
+              <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+                <img src={match.photo} alt="경기 사진" className="w-full h-48 object-cover" />
+              </div>
+            )}
+
+            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
+               <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                 <Swords className="w-3 h-3" /> 주요 경기 기록
+               </h4>
+               
+               <div className="grid grid-cols-2 gap-6">
+                 <div className="space-y-3">
+                   <div className="text-[10px] font-black text-blue-600">BONG HIGHLIGHTS</div>
+                   <div className="space-y-2">
+                     {teamAScorers.map(r => (
+                       <div key={r.memberId} className="flex items-center gap-2">
+                         <Target className="w-3 h-3 text-blue-500" />
+                         <span className="text-xs font-bold">{members.find(m => m.id === r.memberId)?.name}</span>
+                         <span className="text-[10px] font-black text-blue-700 bg-blue-100 px-1.5 rounded-md">{r.goals}골</span>
+                       </div>
+                     ))}
+                     {teamAAssists.map(r => (
+                       <div key={r.memberId} className="flex items-center gap-2">
+                         <Footprints className="w-3 h-3 text-emerald-500" />
+                         <span className="text-xs font-medium text-gray-600">{members.find(m => m.id === r.memberId)?.name}</span>
+                         <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 rounded-md">{r.assists}도움</span>
+                       </div>
+                     ))}
+                     {teamAScorers.length === 0 && teamAAssists.length === 0 && <div className="text-[10px] text-gray-400 italic">기록 없음</div>}
+                   </div>
+                 </div>
+
+                 <div className="space-y-3">
+                   <div className="text-[10px] font-black text-red-600">HAK HIGHLIGHTS</div>
+                   <div className="space-y-2">
+                     {teamBScorers.map(r => (
+                       <div key={r.memberId} className="flex items-center gap-2">
+                         <Target className="w-3 h-3 text-red-500" />
+                         <span className="text-xs font-bold">{members.find(m => m.id === r.memberId)?.name}</span>
+                         <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 rounded-md">{r.goals}골</span>
+                       </div>
+                     ))}
+                     {teamBAssists.map(r => (
+                       <div key={r.memberId} className="flex items-center gap-2">
+                         <Footprints className="w-3 h-3 text-emerald-500" />
+                         <span className="text-xs font-medium text-gray-600">{members.find(m => m.id === r.memberId)?.name}</span>
+                         <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 rounded-md">{r.assists}도움</span>
+                       </div>
+                     ))}
+                     {teamBScorers.length === 0 && teamBAssists.length === 0 && <div className="text-[10px] text-gray-400 italic">기록 없음</div>}
+                   </div>
+                 </div>
+               </div>
+            </div>
+
             {mvpMember && (
               <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4 flex items-center gap-4">
                 <div className="bg-yellow-400 p-2 rounded-xl text-white"><Award className="w-8 h-8" /></div>
                 <div><div className="text-[10px] font-black text-yellow-600 uppercase">Match MVP</div><div className="text-lg font-black text-yellow-900">{mvpMember.name}</div></div>
               </div>
             )}
+            
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-3"><div className="text-xs font-black text-blue-600 px-1 border-b pb-2">BONG TEAM</div>
+              <div className="space-y-3">
+                <div className="text-xs font-black text-blue-600 px-1 border-b pb-2 flex justify-between">
+                  <span>BONG TEAM</span>
+                  <span className="text-[10px] opacity-60">{match.teamA.length}명</span>
+                </div>
                 {match.teamA.map(id => {
                   const m = members.find(mem => mem.id === id);
-                  return m ? <div key={id} className="flex items-center gap-2 p-2 bg-blue-50/50 rounded-xl border border-blue-100 text-[10px] font-bold"><img src={m.photo} className="w-6 h-6 rounded-full" />{m.name}</div> : null;
+                  const record = match.records.find(r => r.memberId === id);
+                  return m ? (
+                    <div key={id} className="flex items-center justify-between p-2 bg-blue-50/50 rounded-xl border border-blue-100 text-[10px] font-bold">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <img src={m.photo} className="w-6 h-6 rounded-full flex-shrink-0" />
+                        <span className="truncate">{m.name}</span>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {record?.goals ? <span className="text-blue-600">{record.goals}G</span> : null}
+                        {record?.assists ? <span className="text-emerald-600">{record.assists}A</span> : null}
+                      </div>
+                    </div>
+                  ) : null;
                 })}
               </div>
-              <div className="space-y-3"><div className="text-xs font-black text-red-600 px-1 border-b pb-2">HAK TEAM</div>
+              <div className="space-y-3">
+                <div className="text-xs font-black text-red-600 px-1 border-b pb-2 flex justify-between">
+                  <span>HAK TEAM</span>
+                  <span className="text-[10px] opacity-60">{match.teamB.length}명</span>
+                </div>
                 {match.teamB.map(id => {
                   const m = members.find(mem => mem.id === id);
-                  return m ? <div key={id} className="flex items-center gap-2 p-2 bg-red-50/50 rounded-xl border border-red-100 text-[10px] font-bold"><img src={m.photo} className="w-6 h-6 rounded-full" />{m.name}</div> : null;
+                  const record = match.records.find(r => r.memberId === id);
+                  return m ? (
+                    <div key={id} className="flex items-center justify-between p-2 bg-red-50/50 rounded-xl border border-red-100 text-[10px] font-bold">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <img src={m.photo} className="w-6 h-6 rounded-full flex-shrink-0" />
+                        <span className="truncate">{m.name}</span>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {record?.goals ? <span className="text-red-600">{record.goals}G</span> : null}
+                        {record?.assists ? <span className="text-emerald-600">{record.assists}A</span> : null}
+                      </div>
+                    </div>
+                  ) : null;
                 })}
               </div>
             </div>
@@ -342,27 +470,73 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-      <header className="bg-[#073763] text-white p-4 sticky top-0 z-10 shadow-md flex justify-between items-center">
-        <div><h1 className="text-xl font-bold flex items-center gap-2"><Shield className="w-6 h-6" /> BongHak Manager</h1></div>
-        <button onClick={fetchData} className="p-2 hover:bg-white/10 rounded-full transition-colors"><RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} /></button>
+      <header className="bg-[#073763] text-white p-4 sticky top-0 z-10 shadow-md flex flex-col gap-1">
+        <div className="flex justify-between items-center">
+          <div><h1 className="text-xl font-bold flex items-center gap-2"><Shield className="w-6 h-6" /> BongHak Manager</h1></div>
+          <button onClick={fetchData} className="p-2 hover:bg-white/10 rounded-full transition-colors"><RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} /></button>
+        </div>
+        <div className="flex items-center gap-1.5 opacity-60">
+          <CloudCheck className="w-3 h-3 text-emerald-400" />
+          <span className="text-[10px] font-bold text-white">클라우드 동기화 완료</span>
+        </div>
       </header>
       <main className="flex-1 p-4 overflow-y-auto">
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
-            <div className="bg-[#073763] rounded-3xl p-5 shadow-xl text-white">
-              <h2 className="text-lg font-bold mb-4">봉팀 vs 학팀 통산 전적</h2>
-              <div className="flex justify-between items-end gap-4">
-                <div className="flex-1 text-center"><div className="text-3xl font-black text-blue-300">{teamTotalStats.winsA}</div><div className="text-[10px] font-bold opacity-60">봉팀 승</div></div>
-                <div className="px-4 py-1 bg-white/10 rounded-full text-xs font-black">{teamTotalStats.draws} 무</div>
-                <div className="flex-1 text-center"><div className="text-3xl font-black text-red-300">{teamTotalStats.winsB}</div><div className="text-[10px] font-bold opacity-60">학팀 승</div></div>
+            <div className="bg-[#073763] rounded-[2rem] p-6 shadow-xl text-white relative overflow-hidden">
+              <div className="absolute top-1/2 right-4 -translate-y-1/2 opacity-10 pointer-events-none">
+                <Swords className="w-48 h-48 rotate-12" />
+              </div>
+
+              <div className="relative z-10 space-y-5">
+                <div>
+                  <div className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-1">OVERALL RIVALRY RECORD</div>
+                  <h2 className="text-xl font-black">봉팀 vs 학팀 통산 전적</h2>
+                </div>
+
+                <div className="flex justify-between items-center px-2">
+                  <div className="flex flex-col items-center">
+                    <div className="text-5xl font-black text-blue-400 mb-2">{teamTotalStats.winsA}</div>
+                    <div className="text-[10px] font-bold text-white/70">봉팀 승</div>
+                  </div>
+
+                  <div className="flex flex-col items-center">
+                    <div className="px-5 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/10 shadow-sm mb-1">
+                      <span className="text-[11px] font-black">{teamTotalStats.draws} 무승부</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-center">
+                    <div className="text-5xl font-black text-red-400 mb-2">{teamTotalStats.winsB}</div>
+                    <div className="text-[10px] font-bold text-white/70">학팀 승</div>
+                  </div>
+                </div>
+
+                <div className="border-t border-white/10 pt-4 flex justify-between items-center">
+                  <div className="text-[10px] font-bold text-white/50">총 경기 수: {teamTotalStats.total}경기</div>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-2 h-2 rounded-full ${teamTotalStats.winsA > teamTotalStats.winsB ? 'bg-blue-400' : teamTotalStats.winsB > teamTotalStats.winsA ? 'bg-red-400' : 'bg-gray-400'}`} />
+                    <span className="text-[10px] font-black uppercase tracking-tight">
+                      {teamTotalStats.winsA > teamTotalStats.winsB ? 'Bong Team Leads' : teamTotalStats.winsB > teamTotalStats.winsA ? 'Hak Team Leads' : 'Evenly Matched'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
+
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-[#073763]"><PlayCircle className="w-5 h-5" /> 최근 결과</h2>
+              <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-[#073763]"><PlayCircle className="w-5 h-5" /> 최근 경기 결과</h2>
               <div className="space-y-4">
-                {matches.slice(0, 3).map(m => (
+                {matches.slice(0, 2).map(m => (
                   <div key={m.id} className="border-b pb-3 last:border-0">
-                    <div className="flex justify-between text-[10px] text-gray-500 font-black mb-1"><div>{formatKoreanDate(m.date)}</div><div>{m.venue}</div></div>
+                    <div className="flex justify-between text-[10px] text-gray-500 font-black mb-1">
+                      <div>{formatKoreanDate(m.date)}</div>
+                      <div className="flex gap-1">
+                        <span>{m.category}</span>
+                        <span>·</span>
+                        <span>{m.venue}</span>
+                      </div>
+                    </div>
                     <div className="flex justify-between items-center px-4">
                       <div className="text-2xl font-black text-blue-800">{m.scoreA}</div><div className="font-bold text-gray-200">VS</div><div className="text-2xl font-black text-red-800">{m.scoreB}</div>
                     </div>
@@ -373,11 +547,47 @@ const App: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <button onClick={() => { setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [] }); setEditingMatchId(null); setShowMatchForm(true); }} className="w-full mt-4 bg-red-600 text-white py-4 rounded-2xl font-bold">새 경기 기록하기</button>
+              <button onClick={() => { setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); }} className="w-full mt-4 bg-red-600 text-white py-4 rounded-2xl font-bold">새 경기 기록하기</button>
             </div>
             <TacticsBoard members={members} />
           </div>
         )}
+
+        {/* New Tab: All Matches List */}
+        {activeTab === 'matches_list' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center px-2">
+              <h2 className="text-xl font-bold text-[#073763]">모든 경기</h2>
+              <button onClick={() => { setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button>
+            </div>
+            <div className="space-y-3">
+              {sortedMatches.map(m => (
+                <div key={m.id} onClick={() => setSelectedMatchDetail(m)} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 active:scale-[0.98] transition-all cursor-pointer">
+                  <div className="flex-shrink-0 w-12 h-12 bg-[#073763]/5 rounded-xl flex flex-col items-center justify-center">
+                    <span className="text-[10px] font-black text-[#073763] uppercase leading-none mb-0.5">{m.date.split('-')[1]}월</span>
+                    <span className="text-lg font-black text-[#073763] leading-none">{m.date.split('-')[2]}</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-tighter">{m.category}</span>
+                      <span className="text-[9px] font-bold text-gray-400">{m.venue}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-[#073763]">봉팀 {m.scoreA}</span>
+                      <span className="text-[10px] font-black text-gray-300">VS</span>
+                      <span className="text-sm font-bold text-[#073763]">학팀 {m.scoreB}</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-300" />
+                </div>
+              ))}
+              {sortedMatches.length === 0 && (
+                <div className="text-center py-20 text-gray-400 text-sm font-medium">기록된 경기가 없습니다.</div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'members' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center px-2"><h2 className="text-xl font-bold text-[#073763]">회원 ({members.length})</h2><button onClick={() => { setEditingMember({ position: Position.MF, clubRole: ClubRole.MEMBER }); setShowMemberForm(true); }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button></div>
@@ -387,6 +597,7 @@ const App: React.FC = () => {
                 <div className="flex-1"><div className="font-bold">{m.name}</div><div className="text-xs text-gray-500">{m.position} | {m.phone}</div></div>
                 <div className="flex gap-2">
                   <button onClick={() => { setEditingMember(m); setShowMemberForm(true); }} className="p-2.5 bg-gray-50 rounded-xl"><Edit2 className="w-4 h-4" /></button>
+                  <button onClick={() => window.location.href = `sms:${m.phone}`} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><MessageCircle className="w-4 h-4" /></button>
                   <button onClick={() => window.location.href = `tel:${m.phone}`} className="p-2.5 bg-[#073763]/10 rounded-xl"><Phone className="w-4 h-4" /></button>
                 </div>
               </div>
@@ -462,11 +673,22 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Navigation Bar with New 'Matches' tab */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-3 max-w-md mx-auto z-20 pb-6">
-        {[{ id: 'dashboard', icon: LayoutDashboard, label: '홈' }, { id: 'members', icon: Users, label: '회원' }, { id: 'stats', icon: Trophy, label: '기록' }].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 ${activeTab === tab.id ? 'text-[#073763]' : 'text-gray-400'}`}><tab.icon className="w-6 h-6" /><span className="text-[10px] font-bold">{tab.label}</span></button>
+        {[
+          { id: 'dashboard', icon: LayoutDashboard, label: '홈' },
+          { id: 'matches_list', icon: PlayCircle, label: '경기' },
+          { id: 'members', icon: Users, label: '회원' },
+          { id: 'stats', icon: Trophy, label: '기록' }
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeTab === tab.id ? 'text-[#073763] scale-110' : 'text-gray-400'}`}>
+            <tab.icon className={`w-6 h-6 ${activeTab === tab.id ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+            <span className={`text-[10px] font-black ${activeTab === tab.id ? 'opacity-100' : 'opacity-60'}`}>{tab.label}</span>
+          </button>
         ))}
       </nav>
+
       {showMemberForm && (
         <div className="fixed inset-0 bg-black/60 z-50 flex flex-col p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl flex-1 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
@@ -483,20 +705,136 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 z-50 flex flex-col p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl flex-1 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-5 flex justify-between items-center border-b"><h3 className="text-xl font-black text-[#073763]">경기 기록</h3><button onClick={() => { setShowMatchForm(false); setEditingMatchId(null); }} className="p-2 bg-gray-100 rounded-full"><X className="w-6 h-6"/></button></div>
-            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-              <input type="date" className="w-full p-3 bg-gray-50 border rounded-xl font-bold" value={newMatch.date} onChange={(e) => setNewMatch({...newMatch, date: e.target.value})} />
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-4 rounded-3xl text-center font-black text-blue-900 text-3xl">{newMatch.scoreA}</div>
-                <div className="bg-red-50 p-4 rounded-3xl text-center font-black text-red-900 text-3xl">{newMatch.scoreB}</div>
+            <div className="flex-1 p-6 space-y-5 overflow-y-auto">
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 mb-1 block ml-1 uppercase">Match Date</label>
+                  <input type="date" className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#073763]/10 transition-all" value={newMatch.date} onChange={(e) => setNewMatch({...newMatch, date: e.target.value})} />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 mb-1 block ml-1 uppercase">Category</label>
+                    <select className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#073763]/10" value={newMatch.category} onChange={(e) => setNewMatch({...newMatch, category: e.target.value})}>
+                      <option value="매일매일">매일매일</option>
+                      <option value="토요더비">토요더비</option>
+                      <option value="친선경기">친선경기</option>
+                      <option value="기타">기타</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 mb-1 block ml-1 uppercase">Venue</label>
+                    <select className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold outline-none focus:ring-2 focus:ring-[#073763]/10" value={newMatch.venue} onChange={(e) => setNewMatch({...newMatch, venue: e.target.value})}>
+                      <option value="대천초등">대천초등</option>
+                      <option value="시설공단">시설공단</option>
+                      <option value="박지성센터">박지성센터</option>
+                      <option value="기타">기타(직접입력)</option>
+                    </select>
+                  </div>
+                </div>
+                
+                {newMatch.venue === '기타' && (
+                  <input type="text" placeholder="장소 직접 입력" className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold outline-none" onChange={(e) => setNewMatch({...newMatch, venue: e.target.value})} />
+                )}
               </div>
-              <div className="h-72 border rounded-2xl overflow-hidden"><MemberSelector members={members} selectedIds={newMatch.teamA || []} onToggle={(id) => setNewMatch({ ...newMatch, teamA: newMatch.teamA?.includes(id) ? newMatch.teamA.filter(i => i !== id) : [...(newMatch.teamA || []), id] })} /></div>
-              <div className="h-72 border rounded-2xl overflow-hidden"><MemberSelector members={members} selectedIds={newMatch.teamB || []} onToggle={(id) => setNewMatch({ ...newMatch, teamB: newMatch.teamB?.includes(id) ? newMatch.teamB.filter(i => i !== id) : [...(newMatch.teamB || []), id] })} /></div>
-              {(newMatch.teamA?.length || 0) + (newMatch.teamB?.length || 0) > 0 && <div className="space-y-4">
-                {newMatch.teamA?.map(id => renderPlayerRecordInput(id, 'blue'))}
-                {newMatch.teamB?.map(id => renderPlayerRecordInput(id, 'red'))}
-              </div>}
+
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="bg-blue-50 p-4 rounded-3xl text-center">
+                  <div className="text-[10px] font-black text-blue-400 mb-1">BONG</div>
+                  <div className="font-black text-blue-900 text-3xl">{newMatch.scoreA}</div>
+                </div>
+                <div className="bg-red-50 p-4 rounded-3xl text-center">
+                  <div className="text-[10px] font-black text-red-400 mb-1">HAK</div>
+                  <div className="font-black text-red-900 text-3xl">{newMatch.scoreB}</div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-blue-600 ml-1 uppercase">봉팀 명단 선택</label>
+                  <div className="h-64 border-2 border-blue-50 rounded-2xl overflow-hidden shadow-inner bg-white">
+                    <MemberSelector members={members} selectedIds={newMatch.teamA || []} onToggle={(id) => setNewMatch({ ...newMatch, teamA: newMatch.teamA?.includes(id) ? newMatch.teamA.filter(i => i !== id) : [...(newMatch.teamA || []), id] })} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-red-600 ml-1 uppercase">학팀 명단 선택</label>
+                  <div className="h-64 border-2 border-red-50 rounded-2xl overflow-hidden shadow-inner bg-white">
+                    <MemberSelector members={members} selectedIds={newMatch.teamB || []} onToggle={(id) => setNewMatch({ ...newMatch, teamB: newMatch.teamB?.includes(id) ? newMatch.teamB.filter(i => i !== id) : [...(newMatch.teamB || []), id] })} />
+                  </div>
+                </div>
+              </div>
+
+              {(newMatch.teamA?.length || 0) + (newMatch.teamB?.length || 0) > 0 && (
+                <div className="space-y-6 pt-2">
+                   <div>
+                     <label className="text-[10px] font-black text-gray-400 ml-1 uppercase mb-2 block">Match Records (Goals/Assists)</label>
+                     <div className="space-y-3">
+                       {newMatch.teamA?.map(id => renderPlayerRecordInput(id, 'blue'))}
+                       {newMatch.teamB?.map(id => renderPlayerRecordInput(id, 'red'))}
+                     </div>
+                   </div>
+
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block">Match Day Photo</label>
+                     <div className="relative group">
+                        {newMatch.photo ? (
+                          <div className="relative rounded-3xl overflow-hidden border border-gray-200 aspect-video shadow-md animate-in zoom-in-95 duration-200">
+                            <img src={newMatch.photo} alt="Match preview" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+                            <button 
+                              onClick={() => setNewMatch(prev => ({ ...prev, photo: '' }))}
+                              className="absolute top-3 right-3 p-2 bg-red-500/90 text-white rounded-full shadow-lg active:scale-90 transition-transform backdrop-blur-sm"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                            <div className="absolute bottom-3 left-4 flex items-center gap-2 text-white/90">
+                              <ImageIcon className="w-4 h-4" />
+                              <span className="text-[10px] font-black uppercase tracking-widest">Match Moment Captured</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="relative w-full py-14 bg-gray-50 border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-gray-400 hover:bg-gray-100/50 transition-all active:scale-[0.98] overflow-hidden"
+                          >
+                            <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
+                              <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                  <pattern id="tacticalGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="2"/>
+                                  </pattern>
+                                </defs>
+                                <rect width="100%" height="100%" fill="url(#tacticalGrid)" />
+                                <circle cx="50%" cy="50%" r="60" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
+                              </svg>
+                            </div>
+                            
+                            <div className="relative z-10 w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-gray-100 group-hover:scale-110 transition-transform duration-300">
+                              <Camera className="w-8 h-8 text-[#073763]" />
+                              <div className="absolute -bottom-1 -right-1 bg-[#073763] text-white p-1 rounded-lg">
+                                <Plus className="w-3 h-3" />
+                              </div>
+                            </div>
+                            <div className="relative z-10 flex flex-col items-center">
+                              <span className="text-xs font-black text-[#073763] uppercase tracking-wider">오늘의 경기 사진 기록</span>
+                              <span className="text-[9px] font-bold text-gray-400 mt-1">촬영하거나 갤러리에서 선택</span>
+                            </div>
+                          </button>
+                        )}
+                        <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          className="hidden" 
+                          accept="image/*" 
+                          capture="environment"
+                          onChange={handlePhotoUpload}
+                        />
+                     </div>
+                   </div>
+                </div>
+              )}
             </div>
-            <div className="p-6 border-t"><button onClick={handleSaveMatch} className="w-full bg-[#073763] text-white py-4 rounded-2xl font-black">저장</button></div>
+            <div className="p-6 border-t"><button onClick={handleSaveMatch} className="w-full bg-[#073763] text-white py-4 rounded-2xl font-black shadow-lg active:scale-95 transition-all">기록 저장하기</button></div>
           </div>
         </div>
       )}
