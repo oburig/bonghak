@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, Cloud, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, CloudCheck, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award } from 'lucide-react';
 import { Member, Match, MatchRecord, Position, ClubRole, PersonalStats } from './types';
 import { INITIAL_MEMBERS } from './constants';
 import { TacticsBoard } from './components/TacticsBoard';
@@ -118,12 +118,7 @@ const App: React.FC = () => {
       
       const text = await response.text();
       let data;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.error("Server response is not valid JSON:", text);
-        throw new Error("Invalid JSON");
-      }
+      try { data = JSON.parse(text); } catch (e) { throw new Error("Invalid JSON"); }
       
       if (data && data.members && Array.isArray(data.members)) {
         const validated = data.members.filter((m: any) => m && (m.id || m.name)).map((m: any) => ({
@@ -148,7 +143,6 @@ const App: React.FC = () => {
       }
       setSyncStatus('success');
     } catch (error: any) {
-      console.error('Data sync failed:', error.message);
       setSyncStatus('error');
     } finally { setLoading(false); }
   }, [loading]);
@@ -400,13 +394,69 @@ const App: React.FC = () => {
           </div>
         )}
         {activeTab === 'stats' && (
-          <div className="space-y-4"><h2 className="text-xl font-bold text-[#073763] px-2">랭킹</h2>
+          <div className="space-y-4">
+            <div className="px-2">
+              <h2 className="text-xl font-bold text-[#073763]">개인 기록 랭킹</h2>
+            </div>
+            
+            <div className="px-2 space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="이름으로 검색..." 
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none"
+                  value={statsSearch}
+                  onChange={(e) => setStatsSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'points', label: 'PTS순' },
+                  { id: 'appearances', label: '출전순' },
+                  { id: 'goals', label: '득점순' },
+                  { id: 'assists', label: '도움순' }
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setStatsSort(item.id as SortType)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-all ${
+                      statsSort === item.id 
+                        ? 'bg-[#073763] text-white' 
+                        : 'bg-white text-gray-400 border border-gray-100'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b"><tr><th className="p-4 text-left">순위</th><th className="p-4 text-left">이름</th><th className="p-4 text-center">출전</th><th className="p-4 text-center">득점</th><th className="p-4 text-right">PTS</th></tr></thead>
-                <tbody>{stats.slice(0, 50).map((s, idx) => (
-                  <tr key={s.memberId} className="border-b last:border-0"><td className="p-4 font-bold">{idx + 1}</td><td className="p-4 font-bold">{s.name}</td><td className="p-4 text-center">{s.appearances}</td><td className="p-4 text-center">{s.goals}</td><td className="p-4 text-right font-black text-[#073763]">{s.points}</td></tr>
-                ))}</tbody>
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="p-4 text-left font-bold text-gray-500">순위</th>
+                    <th className="p-4 text-left font-bold text-gray-500">이름</th>
+                    <th className={`p-4 text-center font-bold ${statsSort === 'appearances' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>출전</th>
+                    <th className={`p-4 text-center font-bold ${statsSort === 'goals' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>득점</th>
+                    <th className={`p-4 text-center font-bold ${statsSort === 'assists' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>도움</th>
+                    <th className={`p-4 text-right font-bold ${statsSort === 'points' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>PTS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.map((s, idx) => (
+                    <tr key={s.memberId} className="border-b last:border-0">
+                      <td className="p-4"><span className={`inline-block w-6 h-6 text-center rounded-lg text-xs font-bold leading-6 ${idx === 0 ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</span></td>
+                      <td className="p-4 font-bold text-gray-800">{s.name}</td>
+                      <td className={`p-4 text-center ${statsSort === 'appearances' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.appearances}</td>
+                      <td className={`p-4 text-center ${statsSort === 'goals' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.goals}</td>
+                      <td className={`p-4 text-center ${statsSort === 'assists' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.assists}</td>
+                      <td className={`p-4 text-right font-black ${statsSort === 'points' ? 'text-[#073763] bg-gray-50' : 'text-gray-400'}`}>{s.points}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           </div>
