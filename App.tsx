@@ -71,6 +71,7 @@ const App: React.FC = () => {
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const memberPhotoInputRef = useRef<HTMLInputElement>(null);
 
   const [newMatch, setNewMatch] = useState<Partial<Match>>({
     date: getKSTDateString(),
@@ -275,6 +276,29 @@ const App: React.FC = () => {
         
         const base64String = canvas.toDataURL('image/jpeg', 0.7);
         setNewMatch(prev => ({ ...prev, photo: base64String }));
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleMemberPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const SIZE = 400;
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, SIZE, SIZE);
+        
+        const base64String = canvas.toDataURL('image/jpeg', 0.8);
+        setEditingMember(prev => ({ ...prev, photo: base64String }));
       };
       img.src = event.target?.result as string;
     };
@@ -553,7 +577,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* New Tab: All Matches List */}
         {activeTab === 'matches_list' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center px-2">
@@ -593,7 +616,7 @@ const App: React.FC = () => {
             <div className="flex justify-between items-center px-2"><h2 className="text-xl font-bold text-[#073763]">회원 ({members.length})</h2><button onClick={() => { setEditingMember({ position: Position.MF, clubRole: ClubRole.MEMBER }); setShowMemberForm(true); }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button></div>
             {members.map(m => (
               <div key={m.id} className="bg-white p-4 rounded-2xl shadow-sm flex items-center gap-3 border border-gray-100">
-                <img src={m.photo || `https://picsum.photos/seed/${m.id}/200`} className="w-14 h-14 rounded-full" />
+                <img src={m.photo || `https://picsum.photos/seed/${m.id}/200`} className="w-14 h-14 rounded-full object-cover" />
                 <div className="flex-1"><div className="font-bold">{m.name}</div><div className="text-xs text-gray-500">{m.position} | {m.phone}</div></div>
                 <div className="flex gap-2">
                   <button onClick={() => { setEditingMember(m); setShowMemberForm(true); }} className="p-2.5 bg-gray-50 rounded-xl"><Edit2 className="w-4 h-4" /></button>
@@ -674,7 +697,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Navigation Bar with New 'Matches' tab */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-3 max-w-md mx-auto z-20 pb-6">
         {[
           { id: 'dashboard', icon: LayoutDashboard, label: '홈' },
@@ -693,11 +715,51 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 z-50 flex flex-col p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl flex-1 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-5 flex justify-between items-center border-b"><h3 className="text-xl font-black text-[#073763]">회원 관리</h3><button onClick={() => { setShowMemberForm(false); setEditingMember(null); }} className="p-2 bg-gray-100 rounded-full"><X className="w-6 h-6"/></button></div>
-            <div className="flex-1 p-6 space-y-4">
-              <input className="w-full p-4 bg-gray-50 border rounded-2xl font-bold" placeholder="이름" value={editingMember?.name || ''} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} />
-              <input className="w-full p-4 bg-gray-50 border rounded-2xl font-bold" placeholder="전화번호" type="tel" value={editingMember?.phone || ''} onChange={(e) => setEditingMember({...editingMember, phone: e.target.value})} />
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+              {/* Member Photo Upload Section */}
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative group">
+                  <div className="w-24 h-24 rounded-full border-2 border-gray-100 overflow-hidden bg-gray-50 shadow-sm">
+                    {editingMember?.photo ? (
+                      <img src={editingMember.photo} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <User className="w-12 h-12" />
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => memberPhotoInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 p-2 bg-[#073763] text-white rounded-full shadow-lg active:scale-90 transition-transform"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                  <input type="file" ref={memberPhotoInputRef} className="hidden" accept="image/*" onChange={handleMemberPhotoUpload} />
+                </div>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Profile Photo</span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 mb-1 block ml-1 uppercase">Full Name</label>
+                  <input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#073763]/10 transition-all" placeholder="이름 입력" value={editingMember?.name || ''} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 mb-1 block ml-1 uppercase">Phone Number</label>
+                  <input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#073763]/10 transition-all" placeholder="010-0000-0000" type="tel" value={editingMember?.phone || ''} onChange={(e) => setEditingMember({...editingMember, phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 mb-1 block ml-1 uppercase">Main Position</label>
+                  <select className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-[#073763]/10 transition-all appearance-none" value={editingMember?.position || Position.MF} onChange={(e) => setEditingMember({...editingMember, position: e.target.value as Position})}>
+                    <option value={Position.FW}>공격수 (FW)</option>
+                    <option value={Position.MF}>미드필더 (MF)</option>
+                    <option value={Position.DF}>수비수 (DF)</option>
+                    <option value={Position.GK}>골키퍼 (GK)</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div className="p-6 border-t"><button onClick={handleSaveMember} className="w-full bg-[#073763] text-white py-4 rounded-2xl font-black">저장</button></div>
+            <div className="p-6 border-t"><button onClick={handleSaveMember} className="w-full bg-[#073763] text-white py-4 rounded-2xl font-black shadow-lg active:scale-95 transition-all">회원 정보 저장</button></div>
           </div>
         </div>
       )}
