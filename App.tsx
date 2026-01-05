@@ -66,7 +66,7 @@ const App: React.FC = () => {
   const [showMatchForm, setShowMatchForm] = useState(false);
   const [showMemberForm, setShowMemberForm] = useState(false);
   const [selectedMatchDetail, setSelectedMatchDetail] = useState<Match | null>(null);
-  const [statsSearch, setStatsSearch] = useState('');
+  const [statsSearch, setSearchTerm] = useState('');
   const [statsSort, setStatsSort] = useState<SortType>('points');
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
@@ -551,7 +551,7 @@ const App: React.FC = () => {
             <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
               <h2 className="text-lg font-bold mb-3 flex items-center gap-2 text-[#073763]"><PlayCircle className="w-5 h-5" /> 최근 경기 결과</h2>
               <div className="space-y-4">
-                {matches.slice(0, 2).map(m => (
+                {sortedMatches.slice(0, 2).map(m => (
                   <div key={m.id} className="border-b pb-3 last:border-0">
                     <div className="flex justify-between text-[10px] text-gray-500 font-black mb-1">
                       <div>{formatKoreanDate(m.date)}</div>
@@ -570,6 +570,9 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 ))}
+                {sortedMatches.length === 0 && (
+                  <div className="text-center py-6 text-gray-400 text-xs font-medium">기록된 경기가 없습니다.</div>
+                )}
               </div>
               <button onClick={() => { setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); }} className="w-full mt-4 bg-red-600 text-white py-4 rounded-2xl font-bold">새 경기 기록하기</button>
             </div>
@@ -641,7 +644,7 @@ const App: React.FC = () => {
                   placeholder="이름으로 검색..." 
                   className="w-full pl-10 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none"
                   value={statsSearch}
-                  onChange={(e) => setStatsSearch(e.target.value)}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
 
@@ -716,7 +719,6 @@ const App: React.FC = () => {
           <div className="bg-white rounded-3xl flex-1 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
             <div className="p-5 flex justify-between items-center border-b"><h3 className="text-xl font-black text-[#073763]">회원 관리</h3><button onClick={() => { setShowMemberForm(false); setEditingMember(null); }} className="p-2 bg-gray-100 rounded-full"><X className="w-6 h-6"/></button></div>
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-              {/* Member Photo Upload Section */}
               <div className="flex flex-col items-center gap-3">
                 <div className="relative group">
                   <div className="w-24 h-24 rounded-full border-2 border-gray-100 overflow-hidden bg-gray-50 shadow-sm">
@@ -813,13 +815,19 @@ const App: React.FC = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-blue-600 ml-1 uppercase">봉팀 명단 선택</label>
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[10px] font-black text-blue-600 uppercase tracking-tight">봉팀 명단 선택</label>
+                    <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{(newMatch.teamA?.length || 0)}명 선택됨</span>
+                  </div>
                   <div className="h-64 border-2 border-blue-50 rounded-2xl overflow-hidden shadow-inner bg-white">
                     <MemberSelector members={members} selectedIds={newMatch.teamA || []} onToggle={(id) => setNewMatch({ ...newMatch, teamA: newMatch.teamA?.includes(id) ? newMatch.teamA.filter(i => i !== id) : [...(newMatch.teamA || []), id] })} />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-red-600 ml-1 uppercase">학팀 명단 선택</label>
+                  <div className="flex justify-between items-center px-1">
+                    <label className="text-[10px] font-black text-red-600 uppercase tracking-tight">학팀 명단 선택</label>
+                    <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">{(newMatch.teamB?.length || 0)}명 선택됨</span>
+                  </div>
                   <div className="h-64 border-2 border-red-50 rounded-2xl overflow-hidden shadow-inner bg-white">
                     <MemberSelector members={members} selectedIds={newMatch.teamB || []} onToggle={(id) => setNewMatch({ ...newMatch, teamB: newMatch.teamB?.includes(id) ? newMatch.teamB.filter(i => i !== id) : [...(newMatch.teamB || []), id] })} />
                   </div>
