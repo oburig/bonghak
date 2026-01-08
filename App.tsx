@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, Cloud, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award, Footprints, Image as ImageIcon } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, Cloud, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award, Footprints, Image as ImageIcon, Lock, CheckCircle2 } from 'lucide-react';
 import { Member, Match, MatchRecord, Position, ClubRole, PersonalStats } from './types';
 import { INITIAL_MEMBERS } from './constants';
 import { TacticsBoard } from './components/TacticsBoard';
@@ -44,6 +44,7 @@ const formatKoreanDate = (dateStr: string) => {
 };
 
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweLgMusWlfUFJw5DrwOVb7Nxd2VQHV7Gzqja28FVjSNQSEeDi5WAnLqTrASEfNMnZw/exec';
+const ADMIN_PASSWORD = '1716';
 
 type SortType = 'points' | 'appearances' | 'goals' | 'assists';
 
@@ -70,6 +71,14 @@ const App: React.FC = () => {
   const [statsSort, setStatsSort] = useState<SortType>('points');
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  
+  // Authorization States
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ type: 'tab' | 'action', value: string } | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const memberPhotoInputRef = useRef<HTMLInputElement>(null);
 
@@ -227,6 +236,33 @@ const App: React.FC = () => {
   const sortedMatches = useMemo(() => {
     return [...matches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [matches]);
+
+  const checkAuth = (type: 'tab' | 'action', value: string) => {
+    if (isAuthorized) {
+      if (type === 'tab') setActiveTab(value);
+      return true;
+    }
+    setPendingAction({ type, value });
+    setShowPasswordModal(true);
+    return false;
+  };
+
+  const handlePasswordSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (passwordInput === ADMIN_PASSWORD) {
+      setIsAuthorized(true);
+      setShowPasswordModal(false);
+      setPasswordInput('');
+      setPasswordError(false);
+      
+      if (pendingAction) {
+        if (pendingAction.type === 'tab') setActiveTab(pendingAction.value);
+        setPendingAction(null);
+      }
+    } else {
+      setPasswordError(true);
+    }
+  };
 
   const handleSaveMatch = () => {
     if (!newMatch.teamA?.length || !newMatch.teamB?.length) return alert("두 팀 모두 선수를 선택해주세요.");
@@ -566,7 +602,11 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button onClick={() => setSelectedMatchDetail(m)} className="flex-1 py-2 bg-gray-50 text-[10px] font-black rounded-lg">상세보기</button>
-                      <button onClick={() => { setNewMatch({ ...m }); setEditingMatchId(m.id); setShowMatchForm(true); }} className="px-3 py-2 bg-[#073763]/10 text-[#073763] text-[10px] font-black rounded-lg">수정</button>
+                      <button onClick={() => { 
+                        if (checkAuth('action', 'edit_match')) {
+                          setNewMatch({ ...m }); setEditingMatchId(m.id); setShowMatchForm(true); 
+                        }
+                      }} className="px-3 py-2 bg-[#073763]/10 text-[#073763] text-[10px] font-black rounded-lg">수정</button>
                     </div>
                   </div>
                 ))}
@@ -574,7 +614,11 @@ const App: React.FC = () => {
                   <div className="text-center py-6 text-gray-400 text-xs font-medium">기록된 경기가 없습니다.</div>
                 )}
               </div>
-              <button onClick={() => { setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); }} className="w-full mt-4 bg-red-600 text-white py-4 rounded-2xl font-bold">새 경기 기록하기</button>
+              <button onClick={() => { 
+                if (checkAuth('action', 'new_match')) {
+                  setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
+                }
+              }} className="w-full mt-4 bg-red-600 text-white py-4 rounded-2xl font-bold">새 경기 기록하기</button>
             </div>
             <TacticsBoard members={members} />
           </div>
@@ -584,7 +628,11 @@ const App: React.FC = () => {
           <div className="space-y-4">
             <div className="flex justify-between items-center px-2">
               <h2 className="text-xl font-bold text-[#073763]">모든 경기</h2>
-              <button onClick={() => { setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button>
+              <button onClick={() => { 
+                if (checkAuth('action', 'new_match')) {
+                  setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
+                }
+              }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button>
             </div>
             <div className="space-y-3">
               {sortedMatches.map(m => (
@@ -616,7 +664,10 @@ const App: React.FC = () => {
 
         {activeTab === 'members' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center px-2"><h2 className="text-xl font-bold text-[#073763]">회원 ({members.length})</h2><button onClick={() => { setEditingMember({ position: Position.MF, clubRole: ClubRole.MEMBER }); setShowMemberForm(true); }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button></div>
+            <div className="flex justify-between items-center px-2">
+              <h2 className="text-xl font-bold text-[#073763]">회원 ({members.length})</h2>
+              <button onClick={() => { setEditingMember({ position: Position.MF, clubRole: ClubRole.MEMBER }); setShowMemberForm(true); }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button>
+            </div>
             {members.map(m => (
               <div key={m.id} className="bg-white p-4 rounded-2xl shadow-sm flex items-center gap-3 border border-gray-100">
                 <img src={m.photo || `https://picsum.photos/seed/${m.id}/200`} className="w-14 h-14 rounded-full object-cover" />
@@ -707,12 +758,78 @@ const App: React.FC = () => {
           { id: 'members', icon: Users, label: '회원' },
           { id: 'stats', icon: Trophy, label: '기록' }
         ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeTab === tab.id ? 'text-[#073763] scale-110' : 'text-gray-400'}`}>
+          <button 
+            key={tab.id} 
+            onClick={() => {
+              if (tab.id === 'members') {
+                checkAuth('tab', 'members');
+              } else {
+                setActiveTab(tab.id);
+              }
+            }} 
+            className={`flex flex-col items-center gap-1 flex-1 transition-all ${activeTab === tab.id ? 'text-[#073763] scale-110' : 'text-gray-400'}`}
+          >
             <tab.icon className={`w-6 h-6 ${activeTab === tab.id ? 'stroke-[2.5px]' : 'stroke-2'}`} />
             <span className={`text-[10px] font-black ${activeTab === tab.id ? 'opacity-100' : 'opacity-60'}`}>{tab.label}</span>
           </button>
         ))}
       </nav>
+
+      {/* Admin Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-xs rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="bg-[#073763] p-8 text-white text-center flex flex-col items-center gap-4">
+              <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center backdrop-blur-sm border border-white/20">
+                <Lock className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black mb-1">관리자 인증</h3>
+                <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest">Admin Authorization Required</p>
+              </div>
+            </div>
+            <form onSubmit={handlePasswordSubmit} className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 ml-1 uppercase tracking-tighter">Enter Password</label>
+                <input 
+                  autoFocus
+                  type="password"
+                  inputMode="numeric"
+                  placeholder="••••"
+                  className={`w-full p-4 bg-gray-50 border ${passwordError ? 'border-red-300 ring-2 ring-red-100' : 'border-gray-100'} rounded-2xl text-center text-2xl font-black tracking-[0.5em] outline-none focus:ring-2 focus:ring-[#073763]/10 transition-all`}
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    setPasswordError(false);
+                  }}
+                />
+                {passwordError && (
+                  <p className="text-[10px] text-red-500 font-bold text-center animate-bounce">비밀번호가 올바르지 않습니다.</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordModal(false);
+                    setPasswordInput('');
+                    setPendingAction(null);
+                  }}
+                  className="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl active:scale-95 transition-all"
+                >
+                  취소
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-[2] py-4 bg-[#073763] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  확인 <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showMemberForm && (
         <div className="fixed inset-0 bg-black/60 z-50 flex flex-col p-4 backdrop-blur-sm">
