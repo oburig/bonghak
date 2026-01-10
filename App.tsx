@@ -603,6 +603,7 @@ const App: React.FC = () => {
                     <div className="flex gap-2 mt-3">
                       <button onClick={() => setSelectedMatchDetail(m)} className="flex-1 py-2 bg-gray-50 text-[10px] font-black rounded-lg">상세보기</button>
                       <button onClick={() => { 
+                        // 수정 시에는 인증 유지 (필요 시 checkAuth 제거 가능)
                         if (checkAuth('action', 'edit_match')) {
                           setNewMatch({ ...m }); setEditingMatchId(m.id); setShowMatchForm(true); 
                         }
@@ -615,9 +616,8 @@ const App: React.FC = () => {
                 )}
               </div>
               <button onClick={() => { 
-                if (checkAuth('action', 'new_match')) {
-                  setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
-                }
+                // 새 경기 기록 시 인증 제거
+                setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
               }} className="w-full mt-4 bg-red-600 text-white py-4 rounded-2xl font-bold">새 경기 기록하기</button>
             </div>
             <TacticsBoard members={members} />
@@ -629,9 +629,8 @@ const App: React.FC = () => {
             <div className="flex justify-between items-center px-2">
               <h2 className="text-xl font-bold text-[#073763]">모든 경기</h2>
               <button onClick={() => { 
-                if (checkAuth('action', 'new_match')) {
-                  setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
-                }
+                // 상단 플러스 버튼도 인증 없이 바로 열기
+                setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
               }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button>
             </div>
             <div className="space-y-3">
