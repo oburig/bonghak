@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, Cloud, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award, Footprints, Image as ImageIcon, Lock, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, Cloud, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award, Footprints, Image as ImageIcon, Lock, CheckCircle2, FileText } from 'lucide-react';
 import { Member, Match, MatchRecord, Position, ClubRole, PersonalStats } from './types';
 import { INITIAL_MEMBERS } from './constants';
 import { TacticsBoard } from './components/TacticsBoard';
@@ -72,7 +72,6 @@ const App: React.FC = () => {
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   
-  // Authorization States
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -91,7 +90,8 @@ const App: React.FC = () => {
     scoreA: 0,
     scoreB: 0,
     records: [],
-    photo: ''
+    photo: '',
+    memo: ''
   });
 
   useEffect(() => {
@@ -152,6 +152,7 @@ const App: React.FC = () => {
           venue: m.venue || '대천초등',
           date: parseToKSTDate(m.date),
           photo: m.photo || '',
+          memo: m.memo || '',
         })));
       }
       setSyncStatus('success');
@@ -277,11 +278,11 @@ const App: React.FC = () => {
     }));
     const payload = {
       type: 'Matches', action: isEdit ? 'update' : 'add', id: matchId,
-      row: [matchId, newMatch.date, JSON.stringify(teamAIds), JSON.stringify(teamBIds), newMatch.scoreA, newMatch.scoreB, JSON.stringify(recordsWithIds), newMatch.photo || '', newMatch.category, newMatch.venue]
+      row: [matchId, newMatch.date, JSON.stringify(teamAIds), JSON.stringify(teamBIds), newMatch.scoreA, newMatch.scoreB, JSON.stringify(recordsWithIds), newMatch.photo || '', newMatch.category, newMatch.venue, newMatch.memo || '']
     };
     syncToSheet(payload);
     setShowMatchForm(false); setEditingMatchId(null);
-    setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' });
+    setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '', memo: '' });
   };
 
   const handleSaveMember = () => {
@@ -407,6 +408,15 @@ const App: React.FC = () => {
             {match.photo && (
               <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
                 <img src={match.photo} alt="경기 사진" className="w-full h-48 object-cover" />
+              </div>
+            )}
+
+            {match.memo && (
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <FileText className="w-3 h-3" /> 경기 메모
+                </h4>
+                <p className="text-xs font-medium text-gray-700 leading-relaxed whitespace-pre-wrap">{match.memo}</p>
               </div>
             )}
 
@@ -603,7 +613,6 @@ const App: React.FC = () => {
                     <div className="flex gap-2 mt-3">
                       <button onClick={() => setSelectedMatchDetail(m)} className="flex-1 py-2 bg-gray-50 text-[10px] font-black rounded-lg">상세보기</button>
                       <button onClick={() => { 
-                        // 수정 시에는 인증 유지 (필요 시 checkAuth 제거 가능)
                         if (checkAuth('action', 'edit_match')) {
                           setNewMatch({ ...m }); setEditingMatchId(m.id); setShowMatchForm(true); 
                         }
@@ -616,8 +625,7 @@ const App: React.FC = () => {
                 )}
               </div>
               <button onClick={() => { 
-                // 새 경기 기록 시 인증 제거
-                setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
+                setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '', memo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
               }} className="w-full mt-4 bg-red-600 text-white py-4 rounded-2xl font-bold">새 경기 기록하기</button>
             </div>
             <TacticsBoard members={members} />
@@ -629,8 +637,7 @@ const App: React.FC = () => {
             <div className="flex justify-between items-center px-2">
               <h2 className="text-xl font-bold text-[#073763]">모든 경기</h2>
               <button onClick={() => { 
-                // 상단 플러스 버튼도 인증 없이 바로 열기
-                setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
+                setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '', memo: '' }); setEditingMatchId(null); setShowMatchForm(true); 
               }} className="p-3 bg-[#073763] text-white rounded-2xl"><Plus className="w-6 h-6" /></button>
             </div>
             <div className="space-y-3">
@@ -774,7 +781,6 @@ const App: React.FC = () => {
         ))}
       </nav>
 
-      {/* Admin Password Modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-xs rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
@@ -1016,6 +1022,16 @@ const App: React.FC = () => {
                           onChange={handlePhotoUpload}
                         />
                      </div>
+                   </div>
+
+                   <div className="space-y-2">
+                     <label className="text-[10px] font-black text-gray-400 ml-1 uppercase block">Match Memo</label>
+                     <textarea 
+                       placeholder="경기 특이사항이나 메모를 입력하세요..." 
+                       className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-medium text-xs outline-none focus:ring-2 focus:ring-[#073763]/10 transition-all min-h-[100px] resize-none"
+                       value={newMatch.memo}
+                       onChange={(e) => setNewMatch({...newMatch, memo: e.target.value})}
+                     />
                    </div>
                 </div>
               )}
