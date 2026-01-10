@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FORMATIONS } from '../constants';
 import { FormationType, Member } from '../types';
-import { RefreshCcw, X, Users, UserPlus } from 'lucide-react';
+import { RefreshCcw, X, Users } from 'lucide-react';
 import { MemberSelector } from './MemberSelector';
 
 interface Props {
@@ -14,22 +14,19 @@ interface PlayerPosition {
   x: number;
   y: number;
   assignedMemberId?: string;
-  lastTap?: number;
 }
 
 export const TacticsBoard: React.FC<Props> = ({ members }) => {
-  const [formation, setFormation] = useState<FormationType>(FormationType.F442);
+  const [formation, setFormation] = useState<FormationType>(FormationType.F352);
   const [playerPositions, setPlayerPositions] = useState<PlayerPosition[]>([]);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [showMemberPicker, setShowMemberPicker] = useState<number | null>(null);
   
-  // 드래그와 클릭을 구분하기 위한 상태
-  const dragInfo = useRef({ startX: 0, startY: 0, hasMoved: false, startTime: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const dragStartPos = useRef({ x: 0, y: 0, time: 0 });
 
-  // Initialize player positions based on formation
   useEffect(() => {
-    const base = FORMATIONS[formation as keyof typeof FORMATIONS] || FORMATIONS['4-4-2'];
+    const base = FORMATIONS[formation as keyof typeof FORMATIONS] || FORMATIONS['3-5-2'];
     setPlayerPositions(prev => {
       return base.map((pos, idx) => ({
         id: idx,
@@ -40,38 +37,34 @@ export const TacticsBoard: React.FC<Props> = ({ members }) => {
     });
   }, [formation]);
 
-  const handleTouchStart = (e: React.TouchEvent, id: number) => {
-    const touch = e.touches[0];
-    dragInfo.current = {
-      startX: touch.clientX,
-      startY: touch.clientY,
-      hasMoved: false,
-      startTime: Date.now()
+  const handlePointerDown = (e: React.PointerEvent, id: number) => {
+    // 캡처를 설정하여 요소 밖으로 나가도 이벤트를 추적
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
+    dragStartPos.current = {
+      x: e.clientX,
+      y: e.clientY,
+      time: Date.now()
     };
     setDraggingId(id);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (draggingId === null || !containerRef.current) return;
     
     const container = containerRef.current.getBoundingClientRect();
-    const touch = e.touches[0];
     
-    // 이동 거리 계산 (임계값 이상 움직이면 드래그로 간주)
-    const moveDist = Math.sqrt(
-      Math.pow(touch.clientX - dragInfo.current.startX, 2) + 
-      Math.pow(touch.clientY - dragInfo.current.startY, 2)
+    // 이동 거리 계산
+    const dist = Math.sqrt(
+      Math.pow(e.clientX - dragStartPos.current.x, 2) + 
+      Math.pow(e.clientY - dragStartPos.current.y, 2)
     );
-    
-    if (moveDist > 5) {
-      dragInfo.current.hasMoved = true;
-    }
 
-    if (dragInfo.current.hasMoved) {
-      let x = ((touch.clientX - container.left) / container.width) * 100;
-      let y = ((touch.clientY - container.top) / container.height) * 100;
+    // 5px 이상 움직였을 때만 위치 업데이트
+    if (dist > 5) {
+      let x = ((e.clientX - container.left) / container.width) * 100;
+      let y = ((e.clientY - container.top) / container.height) * 100;
 
-      // Constrain to field
       x = Math.max(5, Math.min(95, x));
       y = Math.max(5, Math.min(95, y));
 
@@ -81,11 +74,17 @@ export const TacticsBoard: React.FC<Props> = ({ members }) => {
     }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent, id: number) => {
-    const duration = Date.now() - dragInfo.current.startTime;
+  const handlePointerUp = (e: React.PointerEvent, id: number) => {
+    if (draggingId === null) return;
     
-    // 짧게 터치하고 거의 움직이지 않았다면 클릭으로 간주
-    if (!dragInfo.current.hasMoved && duration < 300) {
+    const duration = Date.now() - dragStartPos.current.time;
+    const dist = Math.sqrt(
+      Math.pow(e.clientX - dragStartPos.current.x, 2) + 
+      Math.pow(e.clientY - dragStartPos.current.y, 2)
+    );
+
+    // 짧게 누르고 거의 움직이지 않았다면 '클릭'으로 간주하여 선수 선택창 오픈
+    if (dist < 10 && duration < 300) {
       setShowMemberPicker(id);
     }
     
@@ -93,7 +92,7 @@ export const TacticsBoard: React.FC<Props> = ({ members }) => {
   };
 
   const handleReset = () => {
-    const base = FORMATIONS[formation as keyof typeof FORMATIONS] || FORMATIONS['4-4-2'];
+    const base = FORMATIONS[formation as keyof typeof FORMATIONS] || FORMATIONS['3-5-2'];
     setPlayerPositions(base.map((pos, idx) => ({
       id: idx,
       x: pos.x,
@@ -115,7 +114,7 @@ export const TacticsBoard: React.FC<Props> = ({ members }) => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-[#073763]">전술 대형(친선게임용)</h2>
-          <p className="text-[10px] text-gray-400 font-medium">드래그로 이동 / 번호 클릭으로 선수 배정</p>
+          <p className="text-[10px] text-gray-400 font-medium">번호 클릭: 선수 배정 / 드래그: 위치 이동</p>
         </div>
         <div className="flex gap-2">
           <button onClick={handleReset} className="p-2 bg-gray-100 rounded-lg text-gray-500 active:scale-90 transition-transform">
@@ -146,30 +145,35 @@ export const TacticsBoard: React.FC<Props> = ({ members }) => {
         {/* Players */}
         {playerPositions.map((p) => {
           const assignedMember = members.find(m => m.id === p.assignedMemberId);
+          const isGK = p.id === playerPositions.length - 1 || (formation === FormationType.F352 && p.id === 0);
+          // 3-5-2 등의 데이터 구조에 따라 GK 위치는 FORMATIONS 상의 인덱스를 따름. 
+          // p.id === 0이 보통 GK인 경우가 많음 (constants.tsx 확인 결과)
+          const displayLabel = p.id === 0 ? 'GK' : p.id;
+
           return (
             <div 
               key={p.id}
-              onTouchStart={(e) => handleTouchStart(e, p.id)}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={(e) => handleTouchEnd(e, p.id)}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 ${draggingId === p.id ? 'scale-125 z-20' : ''} transition-transform duration-150 cursor-pointer`}
-              style={{ left: `${p.x}%`, top: `${p.y}%` }}
+              onPointerDown={(e) => handlePointerDown(e, p.id)}
+              onPointerMove={handlePointerMove}
+              onPointerUp={(e) => handlePointerUp(e, p.id)}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10 ${draggingId === p.id ? 'scale-125 z-20' : ''} transition-transform cursor-pointer select-none`}
+              style={{ left: `${p.x}%`, top: `${p.y}%`, touchAction: 'none' }}
             >
-              <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center shadow-lg overflow-hidden transition-colors ${
-                assignedMember ? 'border-yellow-400 bg-white' : 'border-white bg-[#073763] active:bg-[#0a4a84]'
+              <div className={`w-11 h-11 rounded-full border-2 flex items-center justify-center shadow-lg overflow-hidden transition-all ${
+                assignedMember ? 'border-yellow-400 bg-white' : 'border-white bg-[#073763] hover:bg-[#0a4a84]'
               }`}>
                 {assignedMember ? (
-                  <img src={assignedMember.photo} className="w-full h-full object-cover" alt={assignedMember.name} />
+                  <img src={assignedMember.photo} className="w-full h-full object-cover pointer-events-none" alt={assignedMember.name} />
                 ) : (
-                  <span className="text-white text-[10px] font-black">{p.id === 0 ? 'GK' : p.id + 1}</span>
+                  <span className="text-white text-xs font-black">{displayLabel}</span>
                 )}
               </div>
               {assignedMember ? (
-                <div className="bg-[#073763]/80 text-white text-[8px] font-bold px-1.5 py-0.5 rounded mt-0.5 whitespace-nowrap shadow-sm">
+                <div className="bg-[#073763]/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full mt-1 whitespace-nowrap shadow-sm border border-white/20">
                   {assignedMember.name}
                 </div>
               ) : (
-                <div className="bg-black/20 text-white text-[6px] font-bold px-1 rounded mt-0.5">
+                <div className="bg-black/40 text-white text-[8px] font-bold px-1.5 rounded mt-1">
                   선택
                 </div>
               )}
@@ -178,15 +182,14 @@ export const TacticsBoard: React.FC<Props> = ({ members }) => {
         })}
       </div>
       
-      {/* Member Selection Modal for Tactical Position */}
       {showMemberPicker !== null && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex flex-col p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl flex-1 flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-sm h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-5 flex justify-between items-center border-b">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#073763]" />
                 <h3 className="text-lg font-black text-[#073763]">
-                  {showMemberPicker === 0 ? '골키퍼' : `${showMemberPicker + 1}번 포지션`} 선수 배정
+                  {showMemberPicker === 0 ? '골키퍼' : `${showMemberPicker}번 포지션`} 선수 배정
                 </h3>
               </div>
               <button onClick={() => setShowMemberPicker(null)} className="p-2 bg-gray-100 rounded-full text-gray-500"><X className="w-5 h-5"/></button>
@@ -198,16 +201,22 @@ export const TacticsBoard: React.FC<Props> = ({ members }) => {
                 onToggle={(id) => assignMember(id)}
               />
             </div>
-            <div className="p-4 bg-gray-50 border-t">
-               <button 
+            <div className="p-4 bg-gray-50 border-t flex gap-2">
+              <button 
                 onClick={() => {
                   setPlayerPositions(prev => prev.map(p => p.id === showMemberPicker ? { ...p, assignedMemberId: undefined } : p));
                   setShowMemberPicker(null);
                 }}
-                className="w-full py-3 bg-white text-red-500 border border-red-100 rounded-xl font-bold text-sm active:bg-red-50 transition-colors"
-               >
-                 배정 취소
-               </button>
+                className="flex-1 py-3 bg-white text-red-500 border border-red-100 rounded-xl font-bold text-sm active:bg-red-50 transition-colors"
+              >
+                배정 취소
+              </button>
+              <button 
+                onClick={() => setShowMemberPicker(null)}
+                className="flex-1 py-3 bg-[#073763] text-white rounded-xl font-bold text-sm active:opacity-90"
+              >
+                닫기
+              </button>
             </div>
           </div>
         </div>
