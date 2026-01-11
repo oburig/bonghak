@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, Cloud, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award, Footprints, Image as ImageIcon, Lock, CheckCircle2, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, PlayCircle, Shield, MessageCircle, Phone, Plus, Camera, Send, Edit2, Trash2, X, User, Hash, Calendar, RefreshCw, Loader2, Briefcase, WifiOff, Cloud, MapPin, Tag, AlertCircle, Info, Swords, Medal, Search, Filter, ChevronRight, Target, Award, Footprints, Image as ImageIcon, Lock, CheckCircle2, FileText, CircleDot } from 'lucide-react';
 import { Member, Match, MatchRecord, Position, ClubRole, PersonalStats } from './types';
 import { INITIAL_MEMBERS } from './constants';
 import { TacticsBoard } from './components/TacticsBoard';
@@ -46,7 +46,7 @@ const formatKoreanDate = (dateStr: string) => {
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweLgMusWlfUFJw5DrwOVb7Nxd2VQHV7Gzqja28FVjSNQSEeDi5WAnLqTrASEfNMnZw/exec';
 const ADMIN_PASSWORD = '1716';
 
-type SortType = 'points' | 'appearances' | 'goals' | 'assists';
+type SortType = 'points' | 'appearances' | 'goals' | 'assists' | 'mvp';
 
 const App: React.FC = () => {
   const [members, setMembers] = useState<Member[]>(() => {
@@ -219,6 +219,7 @@ const App: React.FC = () => {
       if (statsSort === 'appearances') return b.appearances - a.appearances || b.points - a.points;
       if (statsSort === 'goals') return b.goals - a.goals || b.assists - a.assists;
       if (statsSort === 'assists') return b.assists - a.assists || b.goals - a.goals;
+      if (statsSort === 'mvp') return b.mvpCount - a.mvpCount || b.points - a.points;
       return 0;
     });
   }, [matches, members, statsSearch, statsSort]);
@@ -545,9 +546,12 @@ const App: React.FC = () => {
           <div><h1 className="text-xl font-bold flex items-center gap-2"><Shield className="w-6 h-6" /> BongHak Manager</h1></div>
           <button onClick={fetchData} className="p-2 hover:bg-white/10 rounded-full transition-colors"><RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} /></button>
         </div>
-        <div className="flex items-center gap-1.5 opacity-60">
-          <Cloud className="w-3 h-3 text-emerald-400" />
-          <span className="text-[10px] font-bold text-white">클라우드 동기화 완료</span>
+        <div className="flex items-center justify-between opacity-60">
+          <div className="flex items-center gap-1.5">
+            <Cloud className="w-3 h-3 text-emerald-400" />
+            <span className="text-[10px] font-bold text-white">클라우드 동기화 완료</span>
+          </div>
+          <span className="text-[10px] font-bold text-white pr-1">하루를 리드하는 남자들</span>
         </div>
       </header>
       <main className="flex-1 p-4 overflow-y-auto">
@@ -555,7 +559,7 @@ const App: React.FC = () => {
           <div className="space-y-6">
             <div className="bg-[#073763] rounded-[2rem] p-6 shadow-xl text-white relative overflow-hidden">
               <div className="absolute top-1/2 right-4 -translate-y-1/2 opacity-10 pointer-events-none">
-                <Swords className="w-48 h-48 rotate-12" />
+                <CircleDot className="w-48 h-48 rotate-12 scale-110" />
               </div>
 
               <div className="relative z-10 space-y-5">
@@ -730,7 +734,8 @@ const App: React.FC = () => {
                   { id: 'points', label: 'PTS순' },
                   { id: 'appearances', label: '출전순' },
                   { id: 'goals', label: '득점순' },
-                  { id: 'assists', label: '도움순' }
+                  { id: 'assists', label: '도움순' },
+                  { id: 'mvp', label: 'MVP순' }
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -756,7 +761,7 @@ const App: React.FC = () => {
                     <th className={`p-4 text-center font-bold ${statsSort === 'appearances' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>출전</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'goals' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>득점</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'assists' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>도움</th>
-                    <th className={`p-4 text-right font-bold ${statsSort === 'points' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>PTS</th>
+                    <th className={`p-4 text-right font-bold ${statsSort === 'mvp' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>MVP</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -767,7 +772,7 @@ const App: React.FC = () => {
                       <td className={`p-4 text-center ${statsSort === 'appearances' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.appearances}</td>
                       <td className={`p-4 text-center ${statsSort === 'goals' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.goals}</td>
                       <td className={`p-4 text-center ${statsSort === 'assists' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.assists}</td>
-                      <td className={`p-4 text-right font-black ${statsSort === 'points' ? 'text-[#073763] bg-gray-50' : 'text-gray-400'}`}>{s.points}</td>
+                      <td className={`p-4 text-right font-black ${statsSort === 'mvp' ? 'text-[#073763] bg-gray-50' : 'text-gray-400'}`}>{s.mvpCount}</td>
                     </tr>
                   ))}
                 </tbody>
