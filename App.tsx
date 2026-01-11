@@ -642,23 +642,43 @@ const App: React.FC = () => {
             </div>
             <div className="space-y-3">
               {sortedMatches.map(m => (
-                <div key={m.id} onClick={() => setSelectedMatchDetail(m)} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 active:scale-[0.98] transition-all cursor-pointer">
-                  <div className="flex-shrink-0 w-12 h-12 bg-[#073763]/5 rounded-xl flex flex-col items-center justify-center">
-                    <span className="text-[10px] font-black text-[#073763] uppercase leading-none mb-0.5">{m.date.split('-')[1]}월</span>
-                    <span className="text-lg font-black text-[#073763] leading-none">{m.date.split('-')[2]}</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-tighter">{m.category}</span>
-                      <span className="text-[9px] font-bold text-gray-400">{m.venue}</span>
+                <div key={m.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                  <div onClick={() => setSelectedMatchDetail(m)} className="flex items-center gap-4 active:scale-[0.98] transition-all cursor-pointer">
+                    <div className="flex-shrink-0 w-12 h-12 bg-[#073763]/5 rounded-xl flex flex-col items-center justify-center">
+                      <span className="text-[10px] font-black text-[#073763] uppercase leading-none mb-0.5">{m.date.split('-')[1]}월</span>
+                      <span className="text-lg font-black text-[#073763] leading-none">{m.date.split('-')[2]}</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-[#073763]">봉팀 {m.scoreA}</span>
-                      <span className="text-[10px] font-black text-gray-300">VS</span>
-                      <span className="text-sm font-bold text-[#073763]">학팀 {m.scoreB}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-tighter">{m.category}</span>
+                        <span className="text-[9px] font-bold text-gray-400">{m.venue}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold text-[#073763]">봉팀 {m.scoreA}</span>
+                        <span className="text-[10px] font-black text-gray-300">VS</span>
+                        <span className="text-sm font-bold text-[#073763]">학팀 {m.scoreB}</span>
+                      </div>
                     </div>
+                    <ChevronRight className="w-5 h-5 text-gray-300" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-300" />
+                  <div className="flex gap-2 pt-1 border-t">
+                    <button 
+                      onClick={() => {
+                        if (checkAuth('action', 'edit_match')) {
+                          setNewMatch({ ...m }); setEditingMatchId(m.id); setShowMatchForm(true); 
+                        }
+                      }}
+                      className="flex-1 py-2 bg-gray-50 text-[10px] font-black rounded-lg text-gray-600 flex items-center justify-center gap-1.5"
+                    >
+                      <Edit2 className="w-3 h-3" /> 수정
+                    </button>
+                    <button 
+                      onClick={() => setSelectedMatchDetail(m)}
+                      className="flex-1 py-2 bg-[#073763]/5 text-[10px] font-black rounded-lg text-[#073763]"
+                    >
+                      상세보기
+                    </button>
+                  </div>
                 </div>
               ))}
               {sortedMatches.length === 0 && (
