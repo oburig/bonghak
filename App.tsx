@@ -277,13 +277,44 @@ const App: React.FC = () => {
       name: members.find(m => m.id === r.memberId)?.name || '',
       goals: r.goals, assists: r.assists, isMvp: r.isMvp
     }));
+    
+    // 사진 데이터(newMatch.photo)가 포함되어 있는지 확실히 확인
+    const photoData = newMatch.photo || '';
+
     const payload = {
-      type: 'Matches', action: isEdit ? 'update' : 'add', id: matchId,
-      row: [matchId, newMatch.date, JSON.stringify(teamAIds), JSON.stringify(teamBIds), newMatch.scoreA, newMatch.scoreB, JSON.stringify(recordsWithIds), newMatch.photo || '', newMatch.category, newMatch.venue, newMatch.memo || '']
+      type: 'Matches', 
+      action: isEdit ? 'update' : 'add', 
+      id: matchId,
+      row: [
+        matchId, 
+        newMatch.date, 
+        JSON.stringify(teamAIds), 
+        JSON.stringify(teamBIds), 
+        newMatch.scoreA, 
+        newMatch.scoreB, 
+        JSON.stringify(recordsWithIds), 
+        photoData, 
+        newMatch.category, 
+        newMatch.venue, 
+        newMatch.memo || ''
+      ]
     };
+    
     syncToSheet(payload);
-    setShowMatchForm(false); setEditingMatchId(null);
-    setNewMatch({ date: getKSTDateString(), category: '매일매일', venue: '대천초등', teamA: [], teamB: [], scoreA: 0, scoreB: 0, records: [], photo: '', memo: '' });
+    setShowMatchForm(false); 
+    setEditingMatchId(null);
+    setNewMatch({ 
+      date: getKSTDateString(), 
+      category: '매일매일', 
+      venue: '대천초등', 
+      teamA: [], 
+      teamB: [], 
+      scoreA: 0, 
+      scoreB: 0, 
+      records: [], 
+      photo: '', 
+      memo: '' 
+    });
   };
 
   const handleSaveMember = () => {
