@@ -279,7 +279,7 @@ const App: React.FC = () => {
     }));
     
     // 사진 데이터(newMatch.photo)가 포함되어 있는지 확실히 확인
-    const photoData = newMatch.photo || '';
+    const photoData = String(newMatch.photo || '');
 
     const payload = {
       type: 'Matches', 
@@ -335,7 +335,7 @@ const App: React.FC = () => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800; 
+        const MAX_WIDTH = 600; 
         const scaleSize = MAX_WIDTH / img.width;
         canvas.width = MAX_WIDTH;
         canvas.height = img.height * scaleSize;
@@ -343,7 +343,7 @@ const App: React.FC = () => {
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
         
-        const base64String = canvas.toDataURL('image/jpeg', 0.7);
+        const base64String = canvas.toDataURL('image/jpeg', 0.6);
         setNewMatch(prev => ({ ...prev, photo: base64String }));
       };
       img.src = event.target?.result as string;

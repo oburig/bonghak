@@ -65,6 +65,20 @@ function doPost(e) {
 
 function saveImageToDrive(base64Data, fileName) {
   try {
+    if (!base64Data || typeof base64Data !== 'string' || !base64Data.includes(',')) {
+      return base64Data;
+    }
+    
+    const splitData = base64Data.split(',');
+    if (splitData.length < 2) return base64Data;
+    
+    const header = splitData[0];
+    const content = splitData[1];
+    
+    // Extract mime type
+    const mimeMatch = header.match(/data:(.*?);/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    
     const folderName = "BongHak_Photos";
     let folder;
     const folders = DriveApp.getFoldersByName(folderName);
@@ -74,18 +88,16 @@ function saveImageToDrive(base64Data, fileName) {
       folder = DriveApp.createFolder(folderName);
     }
     
-    const splitData = base64Data.split(',');
-    const contentType = splitData[0].match(/:(.*?);/)[1];
-    const bytes = Utilities.base64Decode(splitData[1]);
-    const blob = Utilities.newBlob(bytes, contentType, fileName);
+    const bytes = Utilities.base64Decode(content);
+    const blob = Utilities.newBlob(bytes, mimeType, fileName);
     
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
     // Direct link for <img> tags
-    return "https://drive.google.com/uc?id=" + file.getId();
+    return "https://drive.google.com/uc?export=view&id=" + file.getId();
   } catch (e) {
-    return base64Data; // 실패 시 base64 그대로 반환
+    return base64Data; // 실패 시 base64 그대로 반환 (시트 용량 초과 주의)
   }
 }
 
