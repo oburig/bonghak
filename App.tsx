@@ -46,7 +46,7 @@ const formatKoreanDate = (dateStr: string) => {
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweLgMusWlfUFJw5DrwOVb7Nxd2VQHV7Gzqja28FVjSNQSEeDi5WAnLqTrASEfNMnZw/exec';
 const ADMIN_PASSWORD = '1716';
 
-type SortType = 'points' | 'appearances' | 'goals' | 'assists' | 'mvp' | 'ownGoals';
+type SortType = 'points' | 'appearances' | 'goals' | 'assists' | 'mvp' | 'ownGoals' | 'winRate';
 
 const App: React.FC = () => {
   const [members, setMembers] = useState<Member[]>(() => {
@@ -188,7 +188,7 @@ const App: React.FC = () => {
         wins: 0, draws: 0, losses: 0, 
         winsA: 0, drawsA: 0, lossesA: 0, 
         winsB: 0, drawsB: 0, lossesB: 0, 
-        points: 0, appearances: 0 
+        points: 0, appearances: 0, winRate: 0 
       };
     });
     matches.forEach(m => {
@@ -249,6 +249,11 @@ const App: React.FC = () => {
         }
       });
     });
+    Object.values(sMap).forEach(s => {
+      if (s.appearances > 0) {
+        s.winRate = (s.wins / s.appearances) * 100;
+      }
+    });
     let result = Object.values(sMap);
     if (statsSearch.trim()) result = result.filter(s => s.name.includes(statsSearch.trim()));
     return result.sort((a, b) => {
@@ -258,6 +263,7 @@ const App: React.FC = () => {
       if (statsSort === 'assists') return b.assists - a.assists || b.goals - a.goals;
       if (statsSort === 'mvp') return b.mvpCount - a.mvpCount || b.points - a.points;
       if (statsSort === 'ownGoals') return b.ownGoals - a.ownGoals || b.points - a.points;
+      if (statsSort === 'winRate') return b.winRate - a.winRate || b.points - a.points;
       return 0;
     });
   }, [matches, members, statsSearch, statsSort]);
@@ -824,6 +830,7 @@ const App: React.FC = () => {
               <div className="flex gap-1 overflow-x-auto no-scrollbar">
                 {[
                   { id: 'points', label: 'PTS순' },
+                  { id: 'winRate', label: '승률순' },
                   { id: 'appearances', label: '출전순' },
                   { id: 'goals', label: '득점순' },
                   { id: 'assists', label: '도움순' },
@@ -852,8 +859,9 @@ const App: React.FC = () => {
                     <th className="p-4 text-left font-bold text-gray-500">순위</th>
                     <th className="p-4 text-left font-bold text-gray-500">이름</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'appearances' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>출전</th>
-                    <th className="p-4 text-center font-bold text-blue-500">봉팀(승/무/패)</th>
-                    <th className="p-4 text-center font-bold text-red-500">학팀(승/무/패)</th>
+                    <th className={`p-4 text-center font-bold ${statsSort === 'winRate' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>승률</th>
+                    <th className="p-4 text-center font-bold text-blue-500">봉팀출전</th>
+                    <th className="p-4 text-center font-bold text-red-500">학팀출전</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'goals' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>득점</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'assists' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>도움</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'ownGoals' ? 'text-[#073763] bg-gray-100' : 'text-red-400'}`}>자살</th>
@@ -866,6 +874,7 @@ const App: React.FC = () => {
                       <td className="p-4"><span className={`inline-block w-6 h-6 text-center rounded-lg text-xs font-bold leading-6 ${idx === 0 ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</span></td>
                       <td className="p-4 font-bold text-gray-800">{s.name}</td>
                       <td className={`p-4 text-center ${statsSort === 'appearances' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.appearances}</td>
+                      <td className={`p-4 text-center ${statsSort === 'winRate' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.winRate.toFixed(1)}%</td>
                       <td className="p-4 text-center text-blue-600 text-[10px] font-bold">{s.winsA}승 {s.drawsA}무 {s.lossesA}패</td>
                       <td className="p-4 text-center text-red-600 text-[10px] font-bold">{s.winsB}승 {s.drawsB}무 {s.lossesB}패</td>
                       <td className={`p-4 text-center ${statsSort === 'goals' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.goals}</td>

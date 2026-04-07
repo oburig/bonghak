@@ -72,4 +72,5 @@ export interface PersonalStats {
   lossesB: number;
   points: number; // 3 for win, 1 for draw
   appearances: number; // 출전수 추가
+  winRate: number; // 승률 추가
 }
