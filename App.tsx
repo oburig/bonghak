@@ -244,7 +244,7 @@ const App: React.FC = () => {
           sMap[finalId].assists += Number(rec.assists || 0);
           sMap[finalId].ownGoals += Number(rec.ownGoals || 0);
           if (rec.isMvp) sMap[finalId].mvpCount++;
-          // 자살골 1개당 승점 1점 차감 (마이너스골 제안 반영)
+          // 자책골 1개당 승점 1점 차감 (마이너스골 제안 반영)
           sMap[finalId].points -= Number(rec.ownGoals || 0);
         }
       });
@@ -532,7 +532,7 @@ const App: React.FC = () => {
                        <div key={r.memberId} className="flex items-center gap-2">
                          <AlertCircle className="w-3 h-3 text-red-500" />
                          <span className="text-xs font-medium text-gray-600">{members.find(m => m.id === r.memberId)?.name}</span>
-                         <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 rounded-md">{r.ownGoals}자살골</span>
+                         <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 rounded-md">{r.ownGoals}자책골</span>
                        </div>
                      ))}
                      {teamAScorers.length === 0 && teamAAssists.length === 0 && teamAOwnGoals.length === 0 && <div className="text-[10px] text-gray-400 italic">기록 없음</div>}
@@ -560,7 +560,7 @@ const App: React.FC = () => {
                        <div key={r.memberId} className="flex items-center gap-2">
                          <AlertCircle className="w-3 h-3 text-red-500" />
                          <span className="text-xs font-medium text-gray-600">{members.find(m => m.id === r.memberId)?.name}</span>
-                         <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 rounded-md">{r.ownGoals}자살골</span>
+                         <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 rounded-md">{r.ownGoals}자책골</span>
                        </div>
                      ))}
                      {teamBScorers.length === 0 && teamBAssists.length === 0 && teamBOwnGoals.length === 0 && <div className="text-[10px] text-gray-400 italic">기록 없음</div>}
@@ -834,7 +834,7 @@ const App: React.FC = () => {
                   { id: 'appearances', label: '출전순' },
                   { id: 'goals', label: '득점순' },
                   { id: 'assists', label: '도움순' },
-                  { id: 'ownGoals', label: '자살골순' },
+                  { id: 'ownGoals', label: '자책골순' },
                   { id: 'mvp', label: 'MVP순' }
                 ].map((item) => (
                   <button
@@ -864,7 +864,7 @@ const App: React.FC = () => {
                     <th className="p-4 text-center font-bold text-red-500">학팀출전</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'goals' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>득점</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'assists' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>도움</th>
-                    <th className={`p-4 text-center font-bold ${statsSort === 'ownGoals' ? 'text-[#073763] bg-gray-100' : 'text-red-400'}`}>자살</th>
+                    <th className={`p-4 text-center font-bold ${statsSort === 'ownGoals' ? 'text-[#073763] bg-gray-100' : 'text-red-400'}`}>자책</th>
                     <th className={`p-4 text-right font-bold ${statsSort === 'mvp' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>MVP</th>
                   </tr>
                 </thead>
