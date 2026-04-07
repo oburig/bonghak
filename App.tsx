@@ -46,7 +46,7 @@ const formatKoreanDate = (dateStr: string) => {
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweLgMusWlfUFJw5DrwOVb7Nxd2VQHV7Gzqja28FVjSNQSEeDi5WAnLqTrASEfNMnZw/exec';
 const ADMIN_PASSWORD = '1716';
 
-type SortType = 'points' | 'appearances' | 'goals' | 'assists' | 'mvp';
+type SortType = 'points' | 'appearances' | 'goals' | 'assists' | 'mvp' | 'ownGoals';
 
 const App: React.FC = () => {
   const [members, setMembers] = useState<Member[]>(() => {
@@ -98,10 +98,16 @@ const App: React.FC = () => {
     if (showMatchForm) {
       const calculatedScoreA = (newMatch.records || [])
         .filter(r => (newMatch.teamA || []).includes(r.memberId))
-        .reduce((sum, r) => sum + (Number(r.goals) || 0), 0);
+        .reduce((sum, r) => sum + (Number(r.goals) || 0), 0) +
+        (newMatch.records || [])
+        .filter(r => (newMatch.teamB || []).includes(r.memberId))
+        .reduce((sum, r) => sum + (Number(r.ownGoals) || 0), 0);
       const calculatedScoreB = (newMatch.records || [])
         .filter(r => (newMatch.teamB || []).includes(r.memberId))
-        .reduce((sum, r) => sum + (Number(r.goals) || 0), 0);
+        .reduce((sum, r) => sum + (Number(r.goals) || 0), 0) +
+        (newMatch.records || [])
+        .filter(r => (newMatch.teamA || []).includes(r.memberId))
+        .reduce((sum, r) => sum + (Number(r.ownGoals) || 0), 0);
       if (calculatedScoreA !== newMatch.scoreA || calculatedScoreB !== newMatch.scoreB) {
         setNewMatch(prev => ({ ...prev, scoreA: calculatedScoreA, scoreB: calculatedScoreB }));
       }
@@ -177,7 +183,13 @@ const App: React.FC = () => {
   const stats = useMemo(() => {
     const sMap: Record<string, PersonalStats> = {};
     members.forEach(m => {
-      if (m && m.id) sMap[m.id] = { memberId: m.id, name: m.name, goals: 0, assists: 0, mvpCount: 0, wins: 0, draws: 0, losses: 0, points: 0, appearances: 0 };
+      if (m && m.id) sMap[m.id] = { 
+        memberId: m.id, name: m.name, goals: 0, assists: 0, ownGoals: 0, mvpCount: 0, 
+        wins: 0, draws: 0, losses: 0, 
+        winsA: 0, drawsA: 0, lossesA: 0, 
+        winsB: 0, drawsB: 0, lossesB: 0, 
+        points: 0, appearances: 0 
+      };
     });
     matches.forEach(m => {
       if (!m) return;
@@ -189,17 +201,39 @@ const App: React.FC = () => {
         const strId = String(id);
         if (!sMap[strId]) return;
         sMap[strId].appearances++;
-        if (isDraw) { sMap[strId].draws++; sMap[strId].points += 1; }
-        else if (teamAWon) { sMap[strId].wins++; sMap[strId].points += 3; }
-        else { sMap[strId].losses++; }
+        if (isDraw) { 
+          sMap[strId].draws++; 
+          sMap[strId].drawsA++;
+          sMap[strId].points += 1; 
+        }
+        else if (teamAWon) { 
+          sMap[strId].wins++; 
+          sMap[strId].winsA++;
+          sMap[strId].points += 3; 
+        }
+        else { 
+          sMap[strId].losses++; 
+          sMap[strId].lossesA++;
+        }
       });
       (m.teamB || []).forEach(id => {
         const strId = String(id);
         if (!sMap[strId]) return;
         sMap[strId].appearances++;
-        if (isDraw) { sMap[strId].draws++; sMap[strId].points += 1; }
-        else if (!teamAWon) { sMap[strId].wins++; sMap[strId].points += 3; }
-        else { sMap[strId].losses++; }
+        if (isDraw) { 
+          sMap[strId].draws++; 
+          sMap[strId].drawsB++;
+          sMap[strId].points += 1; 
+        }
+        else if (!teamAWon) { 
+          sMap[strId].wins++; 
+          sMap[strId].winsB++;
+          sMap[strId].points += 3; 
+        }
+        else { 
+          sMap[strId].losses++; 
+          sMap[strId].lossesB++;
+        }
       });
       (m.records || []).forEach(rec => {
         if (!rec) return;
@@ -208,7 +242,10 @@ const App: React.FC = () => {
         if (finalId && sMap[finalId]) {
           sMap[finalId].goals += Number(rec.goals || 0);
           sMap[finalId].assists += Number(rec.assists || 0);
+          sMap[finalId].ownGoals += Number(rec.ownGoals || 0);
           if (rec.isMvp) sMap[finalId].mvpCount++;
+          // 자살골 1개당 승점 1점 차감 (마이너스골 제안 반영)
+          sMap[finalId].points -= Number(rec.ownGoals || 0);
         }
       });
     });
@@ -220,6 +257,7 @@ const App: React.FC = () => {
       if (statsSort === 'goals') return b.goals - a.goals || b.assists - a.assists;
       if (statsSort === 'assists') return b.assists - a.assists || b.goals - a.goals;
       if (statsSort === 'mvp') return b.mvpCount - a.mvpCount || b.points - a.points;
+      if (statsSort === 'ownGoals') return b.ownGoals - a.ownGoals || b.points - a.points;
       return 0;
     });
   }, [matches, members, statsSearch, statsSort]);
@@ -275,7 +313,7 @@ const App: React.FC = () => {
     const recordsWithIds = (newMatch.records || []).map(r => ({
       memberId: String(r.memberId),
       name: members.find(m => m.id === r.memberId)?.name || '',
-      goals: r.goals, assists: r.assists, isMvp: r.isMvp
+      goals: r.goals, assists: r.assists, ownGoals: r.ownGoals || 0, isMvp: r.isMvp
     }));
     
     // 사진 데이터(newMatch.photo)가 포함되어 있는지 확실히 확인
@@ -377,7 +415,7 @@ const App: React.FC = () => {
   const renderPlayerRecordInput = (id: string, teamColor: 'blue' | 'red') => {
     const m = members.find(member => member.id === id);
     if (!m) return null;
-    const record = newMatch.records?.find(r => r.memberId === id) || { memberId: id, goals: 0, assists: 0, isMvp: false };
+    const record = newMatch.records?.find(r => r.memberId === id) || { memberId: id, goals: 0, assists: 0, ownGoals: 0, isMvp: false };
     const bgColor = teamColor === 'blue' ? 'bg-blue-50/50' : 'bg-red-50/50';
     const borderColor = teamColor === 'blue' ? 'border-blue-100' : 'border-red-100';
     const textColor = teamColor === 'blue' ? 'text-blue-900' : 'text-red-900';
@@ -390,16 +428,23 @@ const App: React.FC = () => {
         <div className="flex items-center gap-1.5">
           <div className="relative">
             <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-gray-400">G</span>
-            <input type="number" className="w-16 p-1.5 bg-white border border-gray-100 rounded-lg text-center text-xs font-bold outline-none" value={record.goals} onChange={(e) => {
+            <input type="number" className="w-12 p-1.5 bg-white border border-gray-100 rounded-lg text-center text-xs font-bold outline-none" value={record.goals} onChange={(e) => {
               const other = (newMatch.records || []).filter(r => r.memberId !== id);
               setNewMatch({ ...newMatch, records: [...other, { ...record, goals: parseInt(e.target.value) || 0 }] });
             }} />
           </div>
           <div className="relative">
             <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-gray-400">A</span>
-            <input type="number" className="w-16 p-1.5 bg-white border border-gray-100 rounded-lg text-center text-xs font-bold outline-none" value={record.assists} onChange={(e) => {
+            <input type="number" className="w-12 p-1.5 bg-white border border-gray-100 rounded-lg text-center text-xs font-bold outline-none" value={record.assists} onChange={(e) => {
               const other = (newMatch.records || []).filter(r => r.memberId !== id);
               setNewMatch({ ...newMatch, records: [...other, { ...record, assists: parseInt(e.target.value) || 0 }] });
+            }} />
+          </div>
+          <div className="relative">
+            <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[7px] font-black text-red-400">OG</span>
+            <input type="number" className="w-12 p-1.5 bg-white border border-red-100 rounded-lg text-center text-xs font-bold outline-none text-red-600" value={record.ownGoals || 0} onChange={(e) => {
+              const other = (newMatch.records || []).filter(r => r.memberId !== id);
+              setNewMatch({ ...newMatch, records: [...other, { ...record, ownGoals: parseInt(e.target.value) || 0 }] });
             }} />
           </div>
           <button onClick={() => {
@@ -417,8 +462,10 @@ const App: React.FC = () => {
 
     const teamAScorers = match.records.filter(r => match.teamA.includes(r.memberId) && r.goals > 0).sort((a,b) => b.goals - a.goals);
     const teamAAssists = match.records.filter(r => match.teamA.includes(r.memberId) && r.assists > 0).sort((a,b) => b.assists - a.assists);
+    const teamAOwnGoals = match.records.filter(r => match.teamA.includes(r.memberId) && r.ownGoals > 0).sort((a,b) => b.ownGoals - a.ownGoals);
     const teamBScorers = match.records.filter(r => match.teamB.includes(r.memberId) && r.goals > 0).sort((a,b) => b.goals - a.goals);
     const teamBAssists = match.records.filter(r => match.teamB.includes(r.memberId) && r.assists > 0).sort((a,b) => b.assists - a.assists);
+    const teamBOwnGoals = match.records.filter(r => match.teamB.includes(r.memberId) && r.ownGoals > 0).sort((a,b) => b.ownGoals - a.ownGoals);
 
     return (
       <div className="fixed inset-0 bg-black/60 z-[60] flex flex-col p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -475,7 +522,14 @@ const App: React.FC = () => {
                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 rounded-md">{r.assists}도움</span>
                        </div>
                      ))}
-                     {teamAScorers.length === 0 && teamAAssists.length === 0 && <div className="text-[10px] text-gray-400 italic">기록 없음</div>}
+                     {teamAOwnGoals.map(r => (
+                       <div key={r.memberId} className="flex items-center gap-2">
+                         <AlertCircle className="w-3 h-3 text-red-500" />
+                         <span className="text-xs font-medium text-gray-600">{members.find(m => m.id === r.memberId)?.name}</span>
+                         <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 rounded-md">{r.ownGoals}자살골</span>
+                       </div>
+                     ))}
+                     {teamAScorers.length === 0 && teamAAssists.length === 0 && teamAOwnGoals.length === 0 && <div className="text-[10px] text-gray-400 italic">기록 없음</div>}
                    </div>
                  </div>
 
@@ -496,7 +550,14 @@ const App: React.FC = () => {
                          <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 rounded-md">{r.assists}도움</span>
                        </div>
                      ))}
-                     {teamBScorers.length === 0 && teamBAssists.length === 0 && <div className="text-[10px] text-gray-400 italic">기록 없음</div>}
+                     {teamBOwnGoals.map(r => (
+                       <div key={r.memberId} className="flex items-center gap-2">
+                         <AlertCircle className="w-3 h-3 text-red-500" />
+                         <span className="text-xs font-medium text-gray-600">{members.find(m => m.id === r.memberId)?.name}</span>
+                         <span className="text-[10px] font-black text-red-700 bg-red-100 px-1.5 rounded-md">{r.ownGoals}자살골</span>
+                       </div>
+                     ))}
+                     {teamBScorers.length === 0 && teamBAssists.length === 0 && teamBOwnGoals.length === 0 && <div className="text-[10px] text-gray-400 italic">기록 없음</div>}
                    </div>
                  </div>
                </div>
@@ -766,6 +827,7 @@ const App: React.FC = () => {
                   { id: 'appearances', label: '출전순' },
                   { id: 'goals', label: '득점순' },
                   { id: 'assists', label: '도움순' },
+                  { id: 'ownGoals', label: '자살골순' },
                   { id: 'mvp', label: 'MVP순' }
                 ].map((item) => (
                   <button
@@ -783,15 +845,18 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-              <table className="w-full text-sm">
+            <div className="bg-white rounded-2xl shadow-sm overflow-x-auto border border-gray-100">
+              <table className="w-full text-sm min-w-[600px]">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="p-4 text-left font-bold text-gray-500">순위</th>
                     <th className="p-4 text-left font-bold text-gray-500">이름</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'appearances' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>출전</th>
+                    <th className="p-4 text-center font-bold text-blue-500">봉팀(승/무/패)</th>
+                    <th className="p-4 text-center font-bold text-red-500">학팀(승/무/패)</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'goals' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>득점</th>
                     <th className={`p-4 text-center font-bold ${statsSort === 'assists' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>도움</th>
+                    <th className={`p-4 text-center font-bold ${statsSort === 'ownGoals' ? 'text-[#073763] bg-gray-100' : 'text-red-400'}`}>자살</th>
                     <th className={`p-4 text-right font-bold ${statsSort === 'mvp' ? 'text-[#073763] bg-gray-100' : 'text-gray-500'}`}>MVP</th>
                   </tr>
                 </thead>
@@ -801,8 +866,11 @@ const App: React.FC = () => {
                       <td className="p-4"><span className={`inline-block w-6 h-6 text-center rounded-lg text-xs font-bold leading-6 ${idx === 0 ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</span></td>
                       <td className="p-4 font-bold text-gray-800">{s.name}</td>
                       <td className={`p-4 text-center ${statsSort === 'appearances' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.appearances}</td>
+                      <td className="p-4 text-center text-blue-600 text-[10px] font-bold">{s.winsA}승 {s.drawsA}무 {s.lossesA}패</td>
+                      <td className="p-4 text-center text-red-600 text-[10px] font-bold">{s.winsB}승 {s.drawsB}무 {s.lossesB}패</td>
                       <td className={`p-4 text-center ${statsSort === 'goals' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.goals}</td>
                       <td className={`p-4 text-center ${statsSort === 'assists' ? 'font-black text-[#073763] bg-gray-50' : ''}`}>{s.assists}</td>
+                      <td className={`p-4 text-center text-red-500 font-bold ${statsSort === 'ownGoals' ? 'bg-gray-50' : ''}`}>{s.ownGoals}</td>
                       <td className={`p-4 text-right font-black ${statsSort === 'mvp' ? 'text-[#073763] bg-gray-50' : 'text-gray-400'}`}>{s.mvpCount}</td>
                     </tr>
                   ))}

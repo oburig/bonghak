@@ -36,6 +36,7 @@ export interface MatchRecord {
   name?: string;
   goals: number;
   assists: number;
+  ownGoals: number;
   isMvp: boolean;
 }
 
@@ -58,10 +59,17 @@ export interface PersonalStats {
   name: string;
   goals: number;
   assists: number;
+  ownGoals: number;
   mvpCount: number;
   wins: number;
   draws: number;
   losses: number;
+  winsA: number;
+  drawsA: number;
+  lossesA: number;
+  winsB: number;
+  drawsB: number;
+  lossesB: number;
   points: number; // 3 for win, 1 for draw
   appearances: number; // 출전수 추가
 }
