@@ -251,7 +251,8 @@ const App: React.FC = () => {
     });
     Object.values(sMap).forEach(s => {
       if (s.appearances > 0) {
-        s.winRate = (s.wins / s.appearances) * 100;
+        // 승률 계산 시 무승부를 0.5승으로 계산하여 포함 (승 + 무*0.5) / 출전수
+        s.winRate = ((s.wins + s.draws * 0.5) / s.appearances) * 100;
       }
     });
     let result = Object.values(sMap);
