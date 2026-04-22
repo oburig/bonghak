@@ -69,6 +69,7 @@ const App: React.FC = () => {
   const [selectedMatchDetail, setSelectedMatchDetail] = useState<Match | null>(null);
   const [statsSearch, setSearchTerm] = useState('');
   const [statsSort, setStatsSort] = useState<SortType>('points');
+  const [statsYear, setStatsYear] = useState<string>('all');
   const [editingMember, setEditingMember] = useState<Partial<Member> | null>(null);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
   
@@ -180,6 +181,17 @@ const App: React.FC = () => {
     finally { setLoading(false); }
   };
 
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    matches.forEach(m => {
+      if (m.date) {
+        const year = m.date.substring(0, 4);
+        if (year) years.add(year);
+      }
+    });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [matches]);
+
   const stats = useMemo(() => {
     const sMap: Record<string, PersonalStats> = {};
     members.forEach(m => {
@@ -191,7 +203,12 @@ const App: React.FC = () => {
         points: 0, appearances: 0, winRate: 0 
       };
     });
-    matches.forEach(m => {
+
+    const filteredMatches = statsYear === 'all' 
+      ? matches 
+      : matches.filter(m => m.date && m.date.substring(0, 4) === statsYear);
+
+    filteredMatches.forEach(m => {
       if (!m) return;
       const sA = Number(m.scoreA || 0);
       const sB = Number(m.scoreB || 0);
@@ -267,7 +284,7 @@ const App: React.FC = () => {
       if (statsSort === 'winRate') return b.winRate - a.winRate || b.points - a.points;
       return 0;
     });
-  }, [matches, members, statsSearch, statsSort]);
+  }, [matches, members, statsSearch, statsSort, statsYear]);
 
   const teamTotalStats = useMemo(() => {
     let winsA = 0, winsB = 0, draws = 0;
@@ -817,6 +834,32 @@ const App: React.FC = () => {
             </div>
             
             <div className="px-2 space-y-3">
+              <div className="flex gap-1 overflow-x-auto no-scrollbar py-1">
+                <button
+                  onClick={() => setStatsYear('all')}
+                  className={`whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-all ${
+                    statsYear === 'all' 
+                      ? 'bg-[#073763] text-white' 
+                      : 'bg-white text-gray-400 border border-gray-100'
+                  }`}
+                >
+                  전체
+                </button>
+                {availableYears.map(year => (
+                  <button
+                    key={year}
+                    onClick={() => setStatsYear(year)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-[11px] font-black transition-all ${
+                      statsYear === year 
+                        ? 'bg-[#073763] text-white' 
+                        : 'bg-white text-gray-400 border border-gray-100'
+                    }`}
+                  >
+                    {year}년
+                  </button>
+                ))}
+              </div>
+
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
